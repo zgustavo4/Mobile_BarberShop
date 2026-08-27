@@ -897,22 +897,219 @@ app.patch('/agendamentos/:id/status', async (req, res) => {
 
 // ===================== FIDELIDADE =====================
 
-// GET ranking de pontos de todos os clientes
-app.get('/fidelidade/ranking', async (req, res) => {
+// ==========================================
+// ALTERAR STATUS DO AGENDAMENTO
+// E CREDITAR PONTOS AUTOMATICAMENTE
+// ==========================================
+
+app.patch('/agendamentos/:id/status', async (req, res) => {
+
+    const conexaoDB = await conexao.getConnection();
+
     try {
-        const [resultado] = await conexao.query(`
-            SELECT u.id_usuario, u.nome_completo, u.email,
-                   COALESCE(f.pontos, 0) AS pontos
-            FROM usuarios u
-            LEFT JOIN fidelidade f ON f.id_usuario = u.id_usuario
-            ORDER BY pontos DESC
-            LIMIT 10
-        `);
-        res.json(resultado);
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const statusValidos = [
+            'agendado',
+            'confirmado',
+            'concluido',
+            'cancelado'
+        ];
+
+        if (!statusValidos.includes(status)) {
+            return res.status(400).json({
+                error: `Status inválido. Use: ${statusValidos.join(', ')}`
+            });
+        }
+
+        // Iniciar transação
+        await conexaoDB.beginTransaction();
+
+        // ==========================================
+        // BUSCAR AGENDAMENTO
+        // ==========================================
+
+        const [agRows] = await conexaoDB.execute(
+            `
+            SELECT id, id_usuario, status
+            FROM agendamentos
+            WHERE id = ?
+            FOR UPDATE
+            `,
+            [id]
+        );
+
+        if (agRows.length === 0) {
+
+            await conexaoDB.rollback();
+
+            return res.status(404).json({
+                error: 'Agendamento não encontrado'
+            });
+        }
+
+        const agendamento = agRows[0];
+
+        const statusAnterior = agendamento.status;
+
+        // ==========================================
+        // ATUALIZAR STATUS
+        // ==========================================
+
+        await conexaoDB.execute(
+            `
+            UPDATE agendamentos
+            SET status = ?
+            WHERE id = ?
+            `,
+            [status, id]
+        );
+
+        let pontosCreditados = 0;
+
+        // ==========================================
+        // SE ESTÁ SENDO CONCLUÍDO AGORA
+        // ==========================================
+
+        if (
+            status === 'concluido' &&
+            statusAnterior !== 'concluido'
+        ) {
+
+            // Buscar pontos dos serviços
+            const [servicos] = await conexaoDB.execute(
+                `
+                SELECT
+                    s.id_servicos,
+                    s.nome,
+                    s.pontos
+                FROM agendavalor av
+                JOIN servicos s
+                    ON s.id_servicos = av.tipo_servico
+                WHERE av.id_agendamento = ?
+                `,
+                [id]
+            );
+
+            // Somar pontos de todos os serviços
+            pontosCreditados = servicos.reduce(
+                (total, servico) =>
+                    total + parseInt(servico.pontos || 0),
+                0
+            );
+
+            // ==========================================
+            // ADICIONAR PONTOS AO CLIENTE
+            // ==========================================
+
+            if (pontosCreditados > 0) {
+
+                const [fidelidade] = await conexaoDB.execute(
+                    `
+                    SELECT pontos
+                    FROM fidelidade
+                    WHERE id_usuario = ?
+                    FOR UPDATE
+                    `,
+                    [agendamento.id_usuario]
+                );
+
+                if (fidelidade.length > 0) {
+
+                    await conexaoDB.execute(
+                        `
+                        UPDATE fidelidade
+                        SET pontos = pontos + ?
+                        WHERE id_usuario = ?
+                        `,
+                        [
+                            pontosCreditados,
+                            agendamento.id_usuario
+                        ]
+                    );
+
+                } else {
+
+                    await conexaoDB.execute(
+                        `
+                        INSERT INTO fidelidade
+                            (id_usuario, pontos)
+                        VALUES (?, ?)
+                        `,
+                        [
+                            agendamento.id_usuario,
+                            pontosCreditados
+                        ]
+                    );
+                }
+            }
+        }
+
+        // ==========================================
+        // PEGAR NOVO SALDO
+        // ==========================================
+
+        const [novoSaldoRows] = await conexaoDB.execute(
+            `
+            SELECT pontos
+            FROM fidelidade
+            WHERE id_usuario = ?
+            `,
+            [agendamento.id_usuario]
+        );
+
+        const novoSaldo =
+            novoSaldoRows.length > 0
+                ? parseInt(novoSaldoRows[0].pontos || 0)
+                : 0;
+
+        // Finalizar transação
+        await conexaoDB.commit();
+
+        // ==========================================
+        // RESPOSTA
+        // ==========================================
+
+        res.json({
+
+            sucesso: true,
+
+            mensagem:
+                `Status atualizado para "${status}"`,
+
+            id_agendamento: id,
+
+            status_anterior: statusAnterior,
+
+            status_novo: status,
+
+            pontos_creditados: pontosCreditados,
+
+            pontos: novoSaldo
+
+        });
+
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Erro ao buscar ranking de fidelidade" });
+
+        await conexaoDB.rollback();
+
+        console.log(
+            'Erro ao atualizar status:',
+            error
+        );
+
+        res.status(500).json({
+            error: 'Erro ao atualizar status do agendamento'
+        });
+
+    } finally {
+
+        conexaoDB.release();
+
     }
+
 });
 
 // GET historico de resgates realizados
