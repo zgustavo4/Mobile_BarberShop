@@ -1,4 +1,4 @@
-  import React, {
+import React, {
     useState,
     useEffect,
     useCallback
@@ -18,6 +18,8 @@
   } from 'react-native';
 
   import { SafeAreaView } from 'react-native-safe-area-context';
+
+  import * as ImagePicker from 'expo-image-picker';
 
   import {
     NavigationContainer,
@@ -611,6 +613,116 @@
     ] = useState(true);
 
 
+    const [
+      pontosFidelidade,
+      setPontosFidelidade
+    ] = useState(0);
+
+
+    const [
+      metaFidelidade,
+      setMetaFidelidade
+    ] = useState(null);
+
+
+    const fetchFidelidade =
+      async () => {
+
+        try {
+
+          const [
+            resFid,
+            resResgate
+          ] = await Promise.all([
+
+            fetch(
+              `${API_URL}/fidelidade/${user.id_usuario}`
+            ),
+
+            fetch(
+              `${API_URL}/servicos/resgate`
+            )
+
+          ]);
+
+
+          const dataFid =
+            await resFid.json();
+
+          const dataResgate =
+            await resResgate.json();
+
+
+          const pontos =
+            dataFid?.pontos
+              ? parseInt(dataFid.pontos)
+              : 0;
+
+
+          const totalResgatado =
+            dataFid?.total_resgatado
+              ? parseInt(dataFid.total_resgatado)
+              : 0;
+
+
+          const recompensas =
+            Array.isArray(dataResgate)
+              ? dataResgate
+              : [];
+
+
+          const recompensasOrdenadas =
+            [...recompensas].sort(
+              (a, b) =>
+                parseInt(a.pontos_resgate) -
+                parseInt(b.pontos_resgate)
+            );
+
+
+          let restanteResgatado =
+            totalResgatado;
+
+
+          let proxima = null;
+
+
+          for (const r of recompensasOrdenadas) {
+
+            const custo =
+              parseInt(r.pontos_resgate);
+
+
+            if (restanteResgatado >= custo) {
+
+              restanteResgatado -= custo;
+              continue;
+            }
+
+
+            if (pontos < custo) {
+
+              proxima = { ...r, custo };
+              break;
+            }
+          }
+
+
+          setPontosFidelidade(pontos);
+
+          setMetaFidelidade(
+            proxima ? proxima.custo : null
+          );
+
+
+        } catch (error) {
+
+          setPontosFidelidade(0);
+          setMetaFidelidade(null);
+
+        }
+      };
+
+
     const fetchAgendamentos =
       async () => {
 
@@ -686,6 +798,7 @@
       useCallback(() => {
 
         fetchAgendamentos();
+        fetchFidelidade();
 
       }, [user.id_usuario])
     );
@@ -1028,7 +1141,7 @@
               <View style={styles.pointsRow}>
 
                 <Text style={styles.pointsValue}>
-                  320
+                  {pontosFidelidade}
                 </Text>
 
                 <Text style={styles.pointsUnit}>
@@ -1036,7 +1149,9 @@
                 </Text>
 
                 <Text style={styles.pointsGoal}>
-                  Meta: 500 pts
+                  {metaFidelidade
+                    ? `Meta: ${metaFidelidade} pts`
+                    : 'Meta atingida'}
                 </Text>
 
               </View>
@@ -1047,7 +1162,16 @@
                   style={[
                     styles.progressBar,
                     {
-                      width: '64%'
+                      width: `${
+                        metaFidelidade
+                          ? Math.min(
+                              100,
+                              (pontosFidelidade /
+                                metaFidelidade) *
+                                100
+                            )
+                          : 100
+                      }%`
                     }
                   ]}
                 />
@@ -1838,6 +1962,13 @@
 
         </ScrollView>
 
+
+        <BottomNav
+          navigation={navigation}
+          active="Agendar"
+          user={user}
+        />
+
       </SafeAreaView>
     );
   }
@@ -1891,18 +2022,15 @@
 
       let ativo = true;
 
-      const atualizar = async () => {
-        if (ativo) {
-          await carregarDados();
-        }
-      };
+      // Carrega imediatamente ao entrar (com spinner de tela cheia)
+      carregarDados(true);
 
-      // Carrega imediatamente ao entrar
-      atualizar();
-
-      // Atualiza automaticamente a cada 3 segundos
+      // Atualiza automaticamente a cada 3 segundos, em segundo plano
+      // (sem mostrar o spinner, para não piscar a tela)
       const intervalo = setInterval(() => {
-        atualizar();
+        if (ativo) {
+          carregarDados(false);
+        }
       }, 3000);
 
       // Para de atualizar quando sair da tela
@@ -1916,9 +2044,11 @@
 
 
     const carregarDados =
-      async () => {
+      async (mostrarLoading = false) => {
 
-        setLoading(true);
+        if (mostrarLoading) {
+          setLoading(true);
+        }
 
         try {
 
@@ -2648,11 +2778,13 @@
 
 
     const fetchHistorico =
-      async () => {
+      async (mostrarLoading = false) => {
 
         try {
 
-          setLoading(true);
+          if (mostrarLoading) {
+            setLoading(true);
+          }
 
 
           const res =
@@ -2701,7 +2833,9 @@
 
         } finally {
 
-          setLoading(false);
+          if (mostrarLoading) {
+            setLoading(false);
+          }
 
         }
       };
@@ -2712,18 +2846,15 @@
 
       let ativo = true;
 
-      const atualizar = async () => {
-        if (ativo) {
-          await fetchHistorico();
-        }
-      };
+      // Carrega imediatamente ao entrar (com spinner de tela cheia)
+      fetchHistorico(true);
 
-      // Carrega imediatamente
-      atualizar();
-
-      // Atualiza a cada 3 segundos
+      // Atualiza a cada 3 segundos, em segundo plano
+      // (sem mostrar o spinner, para não piscar a tela)
       const intervalo = setInterval(() => {
-        atualizar();
+        if (ativo) {
+          fetchHistorico(false);
+        }
       }, 3000);
 
       // Para ao sair da tela
@@ -3192,6 +3323,94 @@
         id_usuario: '-'
       };
 
+    const [foto, setFoto] = useState(
+      user.foto_perfil ||
+        'https://i.pravatar.cc/300?img=12'
+    );
+
+    const [enviandoFoto, setEnviandoFoto] =
+      useState(false);
+
+    const escolherFoto = async () => {
+
+      const permissao =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissao.granted) {
+        Alert.alert(
+          'Permissão necessária',
+          'Precisamos de acesso à sua galeria para trocar a foto de perfil.'
+        );
+        return;
+      }
+
+      const resultado =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.6,
+          base64: true
+        });
+
+      if (resultado.canceled) {
+        return;
+      }
+
+      const asset = resultado.assets[0];
+
+      const dataUri = asset.base64
+        ? `data:image/jpeg;base64,${asset.base64}`
+        : asset.uri;
+
+      setFoto(dataUri);
+
+      setEnviandoFoto(true);
+
+      try {
+
+        const response = await fetch(
+          `${API_URL}/atualizar`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              id_usuario: user.id_usuario,
+              nome_completo: user.nome,
+              cep: user.cep,
+              email: user.email,
+              foto_perfil: dataUri
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Falha ao salvar');
+        }
+
+        navigation.setParams({
+          user: {
+            ...user,
+            foto_perfil: dataUri
+          }
+        });
+
+      } catch (error) {
+
+        Alert.alert(
+          'Erro',
+          'Não foi possível salvar a nova foto. Tente novamente.'
+        );
+
+      } finally {
+
+        setEnviandoFoto(false);
+
+      }
+    };
+
     const sair = () => {
       Alert.alert(
         'Sair da conta',
@@ -3240,16 +3459,43 @@
 
           <View style={styles.profileHeader}>
 
-            <View style={styles.profilePhotoContainer}>
+            <TouchableOpacity
+              style={styles.profilePhotoContainer}
+              onPress={escolherFoto}
+              disabled={enviandoFoto}
+              activeOpacity={0.8}
+            >
 
               <Image
                 source={{
-                  uri: 'https://i.pravatar.cc/300?img=12'
+                  uri: foto
                 }}
                 style={styles.profilePhoto}
               />
 
-            </View>
+              <View style={styles.profilePhotoEditBadge}>
+
+                {enviandoFoto ? (
+
+                  <ActivityIndicator
+                    color="#111111"
+                    size="small"
+                  />
+
+                ) : (
+
+                  <Text style={styles.profilePhotoEditIcon}>
+                    ✎
+                  </Text>
+                )}
+
+              </View>
+
+            </TouchableOpacity>
+
+            <Text style={styles.profileChangePhotoText}>
+              Toque para alterar a foto
+            </Text>
 
             <Text style={styles.profileName}>
               {user.nome || 'Cliente'}
@@ -4310,7 +4556,7 @@
 
     bookingContent: {
       padding: 22,
-      paddingBottom: 40
+      paddingBottom: 120
     },
 
 
@@ -5526,6 +5772,32 @@
     width: '100%',
     height: '100%',
     borderRadius: 60
+  },
+
+  profilePhotoEditBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 3,
+    borderColor: COLORS.bg,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  profilePhotoEditIcon: {
+    color: '#111111',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+
+  profileChangePhotoText: {
+    color: COLORS.gray,
+    fontSize: 12,
+    marginBottom: 8
   },
 
   profileName: {
