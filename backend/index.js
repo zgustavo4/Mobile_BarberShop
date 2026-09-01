@@ -868,33 +868,6 @@ app.get('/agendamentos/usuario/:id', async (req, res) => {
     }
 });
 
-// PATCH atualizar apenas o status de um agendamento
-app.patch('/agendamentos/:id/status', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { status } = req.body;
-
-        const statusValidos = ['agendado', 'confirmado', 'concluido', 'cancelado'];
-        if (!statusValidos.includes(status)) {
-            return res.status(400).json({ error: `Status inválido. Use: ${statusValidos.join(', ')}` });
-        }
-
-        const [resultado] = await conexao.execute(
-            'UPDATE agendamentos SET status = ? WHERE id = ?',
-            [status, id]
-        );
-
-        if (resultado.affectedRows === 0) {
-            return res.status(404).json({ error: "Agendamento não encontrado" });
-        }
-
-        res.json({ mensagem: `Status atualizado para "${status}"` });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Erro ao atualizar status" });
-    }
-});
-
 // ===================== FIDELIDADE =====================
 
 // ==========================================
