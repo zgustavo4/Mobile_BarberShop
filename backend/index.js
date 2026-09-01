@@ -195,7 +195,8 @@ app.post('/login', async (req, res) => {
                 id_usuario: usuario.id_usuario,
                 nome: usuario.nome_completo,
                 email: usuario.email,
-                cep: usuario.cep
+                cep: usuario.cep,
+                foto_perfil: usuario.foto_perfil || null
             }
         });
     } catch (error) {
@@ -221,7 +222,7 @@ app.get('/buscar', async (req, res) => {
 // Requisito 3a: Edição de usuários (nome, email, senha)
 app.put('/atualizar', async (req, res) => {
     try {
-        const { id_usuario, nome_completo, cep, email, senha } = req.body;
+        const { id_usuario, nome_completo, cep, email, senha, foto_perfil } = req.body;
 
         let query = 'UPDATE usuarios SET nome_completo = ?, cep = ?, email = ?';
         const params = [nome_completo, cep, email];
@@ -231,6 +232,12 @@ app.put('/atualizar', async (req, res) => {
             const hash = await bcrypt.hash(senha, 10);
             query += ', senha = ?, primeiro_acesso = 0';
             params.push(hash);
+        }
+
+        // Se uma nova foto de perfil foi enviada, atualiza também
+        if (foto_perfil) {
+            query += ', foto_perfil = ?';
+            params.push(foto_perfil);
         }
 
         query += ' WHERE id_usuario = ?';
