@@ -46,7 +46,7 @@ import React, {
 
   const COLORS = {
     bg: '#111111',
-    card: '#1E1E1E',
+    card: '#1e1e1eff',
     card2: '#242424',
     border: '#303030',
 
@@ -72,9 +72,11 @@ import React, {
 
   function Logo() {
     return (
-      <View style={styles.logoBadge}>
-        <Text style={styles.logoIcon}>✂</Text>
-      </View>
+      <Image
+        source={require('./assets/logo.png')}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
     );
   }
 
@@ -1208,7 +1210,7 @@ import React, {
               style={styles.inspirationButton}
               onPress={() =>
                 navigation.navigate(
-                  'Agendamento',
+                  'Modelos',
                   { user }
                 )
               }
@@ -1338,11 +1340,82 @@ import React, {
     ] = useState(false);
 
 
+    const [
+      horariosDisponiveis,
+      setHorariosDisponiveis
+    ] = useState([]);
+
+
+    const [
+      loadingHorarios,
+      setLoadingHorarios
+    ] = useState(false);
+
+
     useEffect(() => {
 
       carregarDados();
 
     }, []);
+
+
+    useEffect(() => {
+
+      if (!barbeiroSel || !data) {
+
+        setHorariosDisponiveis([]);
+
+        return;
+      }
+
+      buscarHorariosDisponiveis();
+
+    }, [barbeiroSel, data]);
+
+
+    const buscarHorariosDisponiveis =
+      async () => {
+
+        setLoadingHorarios(true);
+
+        setHora('');
+
+
+        try {
+
+          const res =
+            await fetch(
+              `${API_URL}/funcionarios/${barbeiroSel.id_funcionario}/horarios?data=${data}`
+            );
+
+          const json =
+            await res.json();
+
+          const lista =
+            Array.isArray(json)
+              ? json
+              : Array.isArray(json?.horarios)
+                ? json.horarios
+                : [];
+
+          setHorariosDisponiveis(lista);
+
+
+        } catch (error) {
+
+          setHorariosDisponiveis([]);
+
+          Alert.alert(
+            'Erro',
+            'Não foi possível carregar os horários deste barbeiro.'
+          );
+
+        } finally {
+
+          setLoadingHorarios(false);
+
+        }
+      };
 
 
     const carregarDados =
@@ -1775,65 +1848,6 @@ import React, {
 
 
           <SectionTitle>
-            HORÁRIOS DISPONÍVEIS
-          </SectionTitle>
-
-
-          <View style={styles.hoursGrid}>
-
-            {[
-              '09:00',
-              '09:30',
-              '10:00',
-              '10:30',
-              '11:00',
-              '11:30',
-              '14:00',
-              '14:30',
-              '15:00',
-              '15:30',
-              '16:00',
-              '16:30',
-              '17:00',
-              '17:30',
-              '18:00'
-            ].map(h => {
-
-              const selected =
-                hora === h;
-
-
-              return (
-                <TouchableOpacity
-                  key={h}
-                  style={[
-                    styles.hourCard,
-                    selected &&
-                      styles.hourCardSelected
-                  ]}
-                  onPress={() =>
-                    setHora(h)
-                  }
-                >
-
-                  <Text
-                    style={[
-                      styles.hourText,
-                      selected &&
-                        styles.hourTextSelected
-                    ]}
-                  >
-                    {h}
-                  </Text>
-
-                </TouchableOpacity>
-              );
-            })}
-
-          </View>
-
-
-          <SectionTitle>
             BARBEIROS DISPONÍVEIS
           </SectionTitle>
 
@@ -1915,6 +1929,72 @@ import React, {
             })}
 
           </ScrollView>
+
+
+          <SectionTitle>
+            HORÁRIOS DISPONÍVEIS
+          </SectionTitle>
+
+
+          {!barbeiroSel ? (
+
+            <Text style={styles.multiSelectHint}>
+              Selecione um barbeiro para ver os horários disponíveis
+            </Text>
+
+          ) : loadingHorarios ? (
+
+            <ActivityIndicator
+              color={COLORS.yellow}
+              style={{ marginVertical: 20 }}
+            />
+
+          ) : horariosDisponiveis.length === 0 ? (
+
+            <Text style={styles.multiSelectHint}>
+              {barbeiroSel.nome} não tem horários disponíveis nesse dia
+            </Text>
+
+          ) : (
+
+            <View style={styles.hoursGrid}>
+
+              {horariosDisponiveis.map(h => {
+
+                const selected =
+                  hora === h;
+
+
+                return (
+                  <TouchableOpacity
+                    key={h}
+                    style={[
+                      styles.hourCard,
+                      selected &&
+                        styles.hourCardSelected
+                    ]}
+                    onPress={() =>
+                      setHora(h)
+                    }
+                  >
+
+                    <Text
+                      style={[
+                        styles.hourText,
+                        selected &&
+                          styles.hourTextSelected
+                      ]}
+                    >
+                      {h}
+                    </Text>
+
+                  </TouchableOpacity>
+                );
+              })}
+
+            </View>
+
+          )}
 
 
           {/* RESUMO */}
@@ -3307,6 +3387,221 @@ import React, {
     );
   }
   // ======================================================
+  // MODELOS (INSPIRE-SE)
+  // ======================================================
+
+  const MODELOS_DATA = [
+    {
+      id: '1',
+      nome: 'Corte Social',
+      categoria: 'Cabelo',
+      descricao: 'Clássico e versátil, ideal para o dia a dia.',
+      imagem: ''
+    },
+    {
+      id: '2',
+      nome: 'Degradê',
+      categoria: 'Cabelo',
+      descricao: 'Transição suave com acabamento na navalha.',
+      imagem: ''
+    },
+    {
+      id: '3',
+      nome: 'Low Fade',
+      categoria: 'Cabelo',
+      descricao: 'Laterais com degradê mantendo o topo e atrás.',
+      imagem: ''
+    },
+    {
+      id: '4',
+      nome: 'Moicano Moderno',
+      categoria: 'Cabelo',
+      descricao: 'Estilo marcante, com topo definido e volume.',
+      imagem: ''
+    },
+    {
+      id: '5',
+      nome: 'Barba Cheia',
+      categoria: 'Barba',
+      descricao: 'Volume natural com contornos bem definidos.',
+      imagem: ''
+    },
+    {
+      id: '6',
+      nome: 'Barba Desenhada',
+      categoria: 'Barba',
+      descricao: 'Linhas precisas feitas na navalha.',
+      imagem: ''
+    },
+    {
+      id: '7',
+      nome: 'Combo Corte + Barba',
+      categoria: 'Combo',
+      descricao: 'O visual completo em um único atendimento.',
+      imagem: ''
+    },
+    {
+      id: '8',
+      nome: 'Pezinho e Acabamento',
+      categoria: 'Combo',
+      descricao: 'Finalização impecável para manter o estilo em dia.',
+      imagem: ''
+    }
+  ];
+
+
+  const CATEGORIAS_MODELOS = [
+    'Todos',
+    'Cabelo',
+    'Barba',
+    'Combo'
+  ];
+
+
+  function ModelosScreen({
+    route,
+    navigation
+  }) {
+
+    const user =
+      route.params?.user;
+
+    const [
+      categoriaAtiva,
+      setCategoriaAtiva
+    ] = useState('Todos');
+
+    const modelosFiltrados =
+      categoriaAtiva === 'Todos'
+        ? MODELOS_DATA
+        : MODELOS_DATA.filter(
+            m => m.categoria === categoriaAtiva
+          );
+
+    return (
+      <SafeAreaView style={styles.screen}>
+
+        <ScrollView
+          contentContainerStyle={styles.modelosContent}
+          showsVerticalScrollIndicator={false}
+        >
+
+          <View style={styles.modelosHeader}>
+
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backIcon}>
+                ‹
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ flex: 1 }}>
+
+              <Text style={styles.pageTitle}>
+                Inspire-se
+              </Text>
+
+              <Text style={styles.pageSubtitle}>
+                Modelos de cortes e barbas
+              </Text>
+
+            </View>
+
+          </View>
+
+
+          <View style={styles.filterRow}>
+
+            {CATEGORIAS_MODELOS.map((categoria) => (
+
+              <TouchableOpacity
+                key={categoria}
+                style={[
+                  styles.filterChip,
+                  categoriaAtiva === categoria &&
+                    styles.filterChipActive
+                ]}
+                onPress={() =>
+                  setCategoriaAtiva(categoria)
+                }
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    categoriaAtiva === categoria &&
+                      styles.filterChipTextActive
+                  ]}
+                >
+                  {categoria}
+                </Text>
+              </TouchableOpacity>
+
+            ))}
+
+          </View>
+
+
+          <View style={styles.modelosGrid}>
+
+            {modelosFiltrados.map((modelo) => (
+
+              <View
+                key={modelo.id}
+                style={styles.modelCard}
+              >
+
+                <Image
+                  source={{ uri: modelo.imagem }}
+                  style={styles.modelImage}
+                  resizeMode="cover"
+                />
+
+                <View style={styles.modelInfo}>
+
+                  <Text style={styles.modelCategoryTag}>
+                    {modelo.categoria.toUpperCase()}
+                  </Text>
+
+                  <Text style={styles.modelName}>
+                    {modelo.nome}
+                  </Text>
+
+                  <Text style={styles.modelDescricao}>
+                    {modelo.descricao}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.modelBookButton}
+                    onPress={() =>
+                      navigation.navigate(
+                        'Agendamento',
+                        { user }
+                      )
+                    }
+                  >
+                    <Text style={styles.modelBookButtonText}>
+                      Agendar
+                    </Text>
+                  </TouchableOpacity>
+
+                </View>
+
+              </View>
+
+            ))}
+
+          </View>
+
+        </ScrollView>
+
+      </SafeAreaView>
+    );
+  }
+
+
+  // ======================================================
   // PERFIL
   // ======================================================
 
@@ -3325,7 +3620,7 @@ import React, {
 
     const [foto, setFoto] = useState(
       user.foto_perfil ||
-        'https://i.pravatar.cc/300?img=12'
+        'https://img.magnific.com/vetores-gratis/gradiente-azul-do-utilizador_78370-4692.jpg?semt=ais_hybrid&w=740&q=80'
     );
 
     const [enviandoFoto, setEnviandoFoto] =
@@ -3684,15 +3979,18 @@ import React, {
           }}
         >
 
-          <Text
+          <Image
+            source={icon}
             style={[
-              styles.navIcon,
-              selected &&
-                styles.navIconActive
+              styles.navIconImage,
+              {
+                tintColor: selected
+                  ? COLORS.yellow
+                  : COLORS.gray
+              }
             ]}
-          >
-            {icon}
-          </Text>
+            resizeMode="contain"
+          />
 
           <Text
             style={[
@@ -3714,31 +4012,31 @@ import React, {
 
         {item(
           'Home',
-          '⌂',
+          require('./assets/nav-home.png'),
           'Home'
         )}
 
         {item(
           'Agendar',
-          '□',
+          require('./assets/nav-agendar.png'),
           'Agendamento'
         )}
 
         {item(
           'Histórico',
-          '◷',
+          require('./assets/nav-historico.png'),
           'Historico'
         )}
 
         {item(
           'Fidelidade',
-          '☆',
+          require('./assets/nav-fidelidade.png'),
           'Fidelidade'
         )}
 
         {item(
           'Perfil',
-          '♙',
+          require('./assets/nav-perfil.png'),
           'Perfil'
         )}
 
@@ -3868,6 +4166,14 @@ import React, {
     }}
   />
 
+  <Stack.Screen
+    name="Modelos"
+    component={ModelosScreen}
+    options={{
+      headerShown: false
+    }}
+  />
+
         </Stack.Navigator>
 
       </NavigationContainer>
@@ -3908,16 +4214,10 @@ import React, {
     },
 
 
-    logoBadge: {
-      width: 76,
-      height: 76,
-      borderRadius: 22,
-      backgroundColor:
-        COLORS.yellow,
-      justifyContent:
-        'center',
-      alignItems:
-        'center'
+    logoImage: {
+      width: 90,
+      height: 60,
+      alignSelf: 'flex-start'
     },
 
 
@@ -5716,6 +6016,13 @@ import React, {
     },
 
 
+    navIconImage: {
+      width: 24,
+      height: 24,
+      marginBottom: 2
+    },
+
+
     navText: {
       color:
         COLORS.gray,
@@ -5910,5 +6217,131 @@ import React, {
     fontSize: 25,
     fontWeight: '800'
   },
+
+  // ----------------------------
+  // MODELOS (INSPIRE-SE)
+  // ----------------------------
+
+  modelosContent: {
+    padding: 22,
+    paddingBottom: 120
+  },
+
+  modelosHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14
+  },
+
+  backIcon: {
+    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: -2
+  },
+
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20
+  },
+
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+
+  filterChipActive: {
+    backgroundColor: COLORS.yellow,
+    borderColor: COLORS.yellow
+  },
+
+  filterChipText: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+
+  filterChipTextActive: {
+    color: '#111111'
+  },
+
+  modelosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
+  },
+
+  modelCard: {
+    width: '48%',
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16
+  },
+
+  modelImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: COLORS.card2
+  },
+
+  modelInfo: {
+    padding: 12
+  },
+
+  modelCategoryTag: {
+    color: COLORS.yellow,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1
+  },
+
+  modelName: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 5
+  },
+
+  modelDescricao: {
+    color: COLORS.gray,
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 15
+  },
+
+  modelBookButton: {
+    backgroundColor: COLORS.yellow,
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginTop: 10
+  },
+
+  modelBookButtonText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '800'
+  }
 
   });
