@@ -640,6 +640,71 @@ app.delete('/funcionarios/:id', async (req, res) => {
 });
 
 
+// ===================== HORARIOS DO FUNCIONARIO =====================
+// GET horarios livres de um funcionario em uma data especifica
+app.get('/funcionarios/:id/horarios', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data } = req.query;
+
+        if (!data) {
+            return res.status(400).json({ error: "Informe a data (YYYY-MM-DD)" });
+        }
+
+        // 0 = domingo ... 6 = sabado
+        const diaSemana = new Date(`${data}T00:00:00`).getDay();
+
+        // Jornada do funcionario nesse dia da semana
+        const [jornadas] = await conexao.execute(
+            'SELECT hora_inicio, hora_fim FROM horarios_funcionario WHERE id_funcionario = ? AND dia_semana = ?',
+            [id, diaSemana]
+        );
+
+        if (jornadas.length === 0) {
+            return res.json({ horarios: [] });
+        }
+
+        // Horarios ja ocupados desse funcionario nesse dia
+        const [ocupados] = await conexao.execute(
+            `SELECT TIME_FORMAT(data, '%H:%i') AS hora
+             FROM agendamentos
+             WHERE id_funcionario = ? AND DATE(data) = ? AND status != 'cancelado'`,
+            [id, data]
+        );
+
+        const horariosOcupados = new Set(ocupados.map(o => o.hora));
+
+        // Gera os slots de 30 em 30 min dentro de cada faixa de jornada
+        const INTERVALO_MINUTOS = 30;
+        const horariosLivres = [];
+
+        for (const jornada of jornadas) {
+            let [h, m] = jornada.hora_inicio.split(':').map(Number);
+            const [hFim, mFim] = jornada.hora_fim.split(':').map(Number);
+
+            while (h < hFim || (h === hFim && m < mFim)) {
+                const hora = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+                if (!horariosOcupados.has(hora)) {
+                    horariosLivres.push(hora);
+                }
+
+                m += INTERVALO_MINUTOS;
+                if (m >= 60) {
+                    m -= 60;
+                    h += 1;
+                }
+            }
+        }
+
+        res.json({ horarios: horariosLivres });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Erro ao buscar horarios do funcionario" });
+    }
+});
+
+
 // ===================== AGENDAMENTOS =====================
 // GET todos os agendamentos
 app.get('/agendamentos', async (req, res) => {
