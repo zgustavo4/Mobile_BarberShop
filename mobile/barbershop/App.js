@@ -14,7 +14,11 @@ import React, {
     Alert,
     ActivityIndicator,
     FlatList,
-    Image
+    Image,
+    ImageBackground,
+    Modal,
+    KeyboardAvoidingView,
+    Platform
   } from 'react-native';
 
   import { SafeAreaView } from 'react-native-safe-area-context';
@@ -627,6 +631,18 @@ import React, {
     ] = useState(null);
 
 
+    const [
+      barbeiros,
+      setBarbeiros
+    ] = useState([]);
+
+
+    const [
+      loadingBarbeiros,
+      setLoadingBarbeiros
+    ] = useState(true);
+
+
     const fetchFidelidade =
       async () => {
 
@@ -725,6 +741,112 @@ import React, {
       };
 
 
+    const fetchBarbeiros =
+      async () => {
+
+        try {
+
+          const res =
+            await fetch(
+              `${API_URL}/funcionarios`
+            );
+
+          const lista =
+            await res.json();
+
+          if (!Array.isArray(lista)) {
+            setBarbeiros([]);
+            return;
+          }
+
+
+          // data de hoje no formato YYYY-MM-DD (horário local)
+          const hoje = new Date();
+
+          const dataHoje =
+            `${hoje.getFullYear()}-` +
+            `${String(hoje.getMonth() + 1).padStart(2, '0')}-` +
+            `${String(hoje.getDate()).padStart(2, '0')}`;
+
+          const minutosAgora =
+            hoje.getHours() * 60 +
+            hoje.getMinutes();
+
+
+          // busca os horários livres de cada funcionário
+          const comHorarios =
+            await Promise.all(
+              lista.map(async (f) => {
+
+                try {
+
+                  const r =
+                    await fetch(
+                      `${API_URL}/funcionarios/${f.id_funcionario}/horarios?data=${dataHoje}`
+                    );
+
+                  const json =
+                    await r.json();
+
+                  const horarios =
+                    Array.isArray(json)
+                      ? json
+                      : Array.isArray(json?.horarios)
+                        ? json.horarios
+                        : [];
+
+                  // ignora horários que já passaram hoje
+                  const futuros =
+                    horarios.filter((h) => {
+
+                      const [hh, mm] =
+                        String(h)
+                          .split(':')
+                          .map(Number);
+
+                      if (
+                        Number.isNaN(hh) ||
+                        Number.isNaN(mm)
+                      ) {
+                        return true;
+                      }
+
+                      return (
+                        hh * 60 + mm >
+                        minutosAgora
+                      );
+                    });
+
+                  return {
+                    ...f,
+                    horariosHoje:
+                      futuros.length
+                  };
+
+                } catch (e) {
+
+                  return {
+                    ...f,
+                    horariosHoje: null
+                  };
+                }
+              })
+            );
+
+          setBarbeiros(comHorarios);
+
+        } catch (error) {
+
+          setBarbeiros([]);
+
+        } finally {
+
+          setLoadingBarbeiros(false);
+
+        }
+      };
+
+
     const fetchAgendamentos =
       async () => {
 
@@ -801,6 +923,7 @@ import React, {
 
         fetchAgendamentos();
         fetchFidelidade();
+        fetchBarbeiros();
 
       }, [user.id_usuario])
     );
@@ -887,9 +1010,11 @@ import React, {
         );
       }}
     >
-      <Text style={styles.logoutIcon}>
-        ↪
-      </Text>
+      <Image
+        source={require('./assets/icon-sair.png')}
+        style={styles.logoutIconImage}
+        resizeMode="contain"
+      />
     </TouchableOpacity>
   </View>
 
@@ -1133,9 +1258,11 @@ import React, {
           >
 
             <View style={styles.fidelityIconCircle}>
-              <Text style={styles.fidelityIcon}>
-                ★
-              </Text>
+              <Image
+                source={require('./assets/icon-fidelidade.png')}
+                style={styles.fidelityIconImage}
+                resizeMode="contain"
+              />
             </View>
 
             <View style={{ flex: 1 }}>
@@ -1196,7 +1323,12 @@ import React, {
           </SectionTitle>
 
 
-          <View style={styles.inspirationCard}>
+          <ImageBackground
+            source={require('./assets/bg-inspire.png')}
+            style={styles.inspirationCard}
+            imageStyle={styles.inspirationCardImage}
+            resizeMode="cover"
+          >
 
             <Text style={styles.inspirationTitle}>
               Encontre seu estilo
@@ -1220,7 +1352,7 @@ import React, {
               </Text>
             </TouchableOpacity>
 
-          </View>
+          </ImageBackground>
 
 
           {/* BARBEIROS */}
@@ -1230,14 +1362,35 @@ import React, {
           </SectionTitle>
 
 
-          <View style={styles.barbersRow}>
+          {loadingBarbeiros ? (
 
-            {['Carlos', 'André', 'Diego'].map(
-              (nome, index) => (
+            <ActivityIndicator
+              color={COLORS.yellow}
+              style={{ marginVertical: 20 }}
+            />
+
+          ) : barbeiros.length === 0 ? (
+
+            <Text style={styles.emptyText}>
+              Nenhum barbeiro disponível no momento.
+            </Text>
+
+          ) : (
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.barbersRow}
+            >
+
+              {barbeiros.map((b) => (
 
                 <TouchableOpacity
-                  key={nome}
-                  style={styles.barberCard}
+                  key={b.id_funcionario}
+                  style={[
+                    styles.barberCard,
+                    styles.barberCardFixed
+                  ]}
                   onPress={() =>
                     navigation.navigate(
                       'Agendamento',
@@ -1248,28 +1401,32 @@ import React, {
 
                   <View style={styles.barberAvatar}>
                     <Text style={styles.barberAvatarText}>
-                      {nome.charAt(0)}
+                      {b.nome?.charAt(0) || 'B'}
                     </Text>
                   </View>
 
-                  <Text style={styles.barberName}>
-                    {nome}
+                  <Text
+                    style={styles.barberName}
+                    numberOfLines={1}
+                  >
+                    {b.nome?.split(' ')[0]}
                   </Text>
 
                   <Text style={styles.barberHours}>
-                    {index === 0
-                      ? '4 horários'
-                      : index === 1
-                      ? '2 horários'
-                      : '6 horários'}
+                    {b.horariosHoje === null
+                      ? '--'
+                      : b.horariosHoje === 1
+                        ? '1 horário'
+                        : `${b.horariosHoje} horários`}
                   </Text>
 
                 </TouchableOpacity>
 
-              )
-            )}
+              ))}
 
-          </View>
+            </ScrollView>
+
+          )}
 
         </ScrollView>
 
@@ -1282,6 +1439,51 @@ import React, {
 
       </SafeAreaView>
     );
+  }
+
+
+  // ======================================================
+  // IMAGENS DOS SERVIÇOS
+  // ======================================================
+
+  const IMAGENS_SERVICOS = {
+    sobrancelha: require('./assets/servico-sobrancelha.png'),
+    hidratacao: require('./assets/servico-hidratacao.png'),
+    platinado: require('./assets/servico-platinado.png'),
+    barba: require('./assets/servico-barba.png'),
+    corte: require('./assets/servico-corte.png')
+  };
+
+  // Escolhe a imagem pelo nome do serviço (ignora acentos e maiúsculas).
+  // Retorna null se não houver imagem para o serviço.
+  function imagemDoServico(nome) {
+
+    const n = String(nome || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (n.includes('sombrancelha') || n.includes('sobrancelha')) {
+      return IMAGENS_SERVICOS.sobrancelha;
+    }
+
+    if (n.includes('hidrat')) {
+      return IMAGENS_SERVICOS.hidratacao;
+    }
+
+    if (n.includes('platin')) {
+      return IMAGENS_SERVICOS.platinado;
+    }
+
+    if (n.includes('barba')) {
+      return IMAGENS_SERVICOS.barba;
+    }
+
+    if (n.includes('corte') || n.includes('cabelo')) {
+      return IMAGENS_SERVICOS.corte;
+    }
+
+    return null;
   }
 
 
@@ -1749,9 +1951,17 @@ import React, {
 
 
                 <View style={styles.serviceIcon}>
-                  <Text style={styles.serviceIconText}>
-                    ✂
-                  </Text>
+                  {imagemDoServico(item.nome) ? (
+                    <Image
+                      source={imagemDoServico(item.nome)}
+                      style={styles.serviceImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.serviceIconText}>
+                      ✂
+                    </Text>
+                  )}
                 </View>
 
 
@@ -2490,11 +2700,11 @@ import React, {
               </View>
 
 
-              <View style={styles.medalCircle}>
-                <Text style={styles.medal}>
-                  ★
-                </Text>
-              </View>
+              <Image
+                source={require('./assets/icon-fidelidade.png')}
+                style={styles.medalImage}
+                resizeMode="contain"
+              />
 
             </View>
 
@@ -2603,30 +2813,78 @@ import React, {
                 style={styles.rewardRow}
               >
 
-                <View
-                  style={[
-                    styles.rewardCircle,
-                    r.status ===
-                      'resgatado' &&
-                      styles.rewardDone,
+                {imagemDoServico(r.nome) ? (
 
-                    r.status ===
-                      'disponivel' &&
-                      styles.rewardAvailable
-                  ]}
-                >
+                  <View style={styles.rewardImageWrap}>
 
-                  <Text style={styles.rewardIcon}>
-                    {r.status ===
-                      'resgatado'
-                      ? '✓'
-                      : r.status ===
-                        'disponivel'
-                      ? '🎁'
-                      : '🔒'}
-                  </Text>
+                    <View
+                      style={[
+                        styles.rewardImageBox,
+                        r.status ===
+                          'disponivel' &&
+                          styles.rewardImageAvailable
+                      ]}
+                    >
+                      <Image
+                        source={imagemDoServico(r.nome)}
+                        style={[
+                          styles.rewardImage,
+                          r.status ===
+                            'bloqueado' &&
+                            { opacity: 0.45 }
+                        ]}
+                      />
+                    </View>
 
-                </View>
+                    <View
+                      style={[
+                        styles.rewardBadge,
+                        r.status ===
+                          'resgatado' &&
+                          styles.rewardDone
+                      ]}
+                    >
+                      <Text style={styles.rewardBadgeIcon}>
+                        {r.status ===
+                          'resgatado'
+                          ? '✓'
+                          : r.status ===
+                            'disponivel'
+                          ? '🎁'
+                          : '🔒'}
+                      </Text>
+                    </View>
+
+                  </View>
+
+                ) : (
+
+                  <View
+                    style={[
+                      styles.rewardCircle,
+                      r.status ===
+                        'resgatado' &&
+                        styles.rewardDone,
+
+                      r.status ===
+                        'disponivel' &&
+                        styles.rewardAvailable
+                    ]}
+                  >
+
+                    <Text style={styles.rewardIcon}>
+                      {r.status ===
+                        'resgatado'
+                        ? '✓'
+                        : r.status ===
+                          'disponivel'
+                        ? '🎁'
+                        : '🔒'}
+                    </Text>
+
+                  </View>
+
+                )}
 
 
                 <View style={styles.rewardInfo}>
@@ -2736,9 +2994,16 @@ import React, {
               >
 
                 <View style={styles.smallIconBox}>
-                  <Text style={styles.smallIcon}>
-                    ✂
-                  </Text>
+                  {imagemDoServico(s.nome) ? (
+                    <Image
+                      source={imagemDoServico(s.nome)}
+                      style={styles.smallIconImage}
+                    />
+                  ) : (
+                    <Text style={styles.smallIcon}>
+                      ✂
+                    </Text>
+                  )}
                 </View>
 
                 <Text style={styles.howToName}>
@@ -2771,9 +3036,16 @@ import React, {
               >
 
                 <View style={styles.smallIconBox}>
-                  <Text style={styles.smallIcon}>
-                    ✂
-                  </Text>
+                  {imagemDoServico(h.descricao) ? (
+                    <Image
+                      source={imagemDoServico(h.descricao)}
+                      style={styles.smallIconImage}
+                    />
+                  ) : (
+                    <Text style={styles.smallIcon}>
+                      ✂
+                    </Text>
+                  )}
                 </View>
 
 
@@ -3113,9 +3385,25 @@ import React, {
               <View style={styles.historyTop}>
 
                 <View style={styles.historyServiceIcon}>
-                  <Text style={styles.historyServiceIconText}>
-                    ✂
-                  </Text>
+                  {imagemDoServico(
+                    item.servicos?.[0]?.nome ||
+                      item.servico_nome ||
+                      'Corte de Cabelo'
+                  ) ? (
+                    <Image
+                      source={imagemDoServico(
+                        item.servicos?.[0]?.nome ||
+                          item.servico_nome ||
+                          'Corte de Cabelo'
+                      )}
+                      style={styles.historyServiceImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.historyServiceIconText}>
+                      ✂
+                    </Text>
+                  )}
                 </View>
 
 
@@ -3605,6 +3893,139 @@ import React, {
   // PERFIL
   // ======================================================
 
+  const somenteDigitos = (texto) =>
+    String(texto || '').replace(/\D/g, '');
+
+  // 12345678 -> 12345-678
+  const formatarCep = (texto) => {
+
+    const digitos =
+      somenteDigitos(texto).slice(0, 8);
+
+    return digitos.length > 5
+      ? `${digitos.slice(0, 5)}-${digitos.slice(5)}`
+      : digitos;
+  };
+
+
+  // Linha do card "Informações da conta"
+  function PerfilLinha({
+    icone,
+    imagem,
+    rotulo,
+    tag,
+    valor,
+    valorExtra,
+    botao,
+    onPress
+  }) {
+
+    const Container = onPress
+      ? TouchableOpacity
+      : View;
+
+    const propsContainer = onPress
+      ? { onPress, activeOpacity: 0.7 }
+      : {};
+
+    return (
+      <Container
+        style={styles.profileInfoRow}
+        {...propsContainer}
+      >
+
+        <View style={styles.profileInfoIcon}>
+          {imagem ? (
+            <Image
+              source={imagem}
+              style={styles.profileInfoIconImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.profileInfoIconText}>
+              {icone}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.profileInfoText}>
+
+          <View style={styles.profileLabelRow}>
+
+            <Text style={styles.profileInfoLabelInline}>
+              {rotulo}
+            </Text>
+
+            {tag ? (
+              <View style={styles.profileTag}>
+                <Text style={styles.profileTagText}>
+                  {tag}
+                </Text>
+              </View>
+            ) : null}
+
+          </View>
+
+          <Text
+            style={styles.profileInfoValue}
+            numberOfLines={1}
+          >
+            {valor}
+
+            {valorExtra ? (
+              <Text style={styles.profileInfoValueMuted}>
+                {valorExtra}
+              </Text>
+            ) : null}
+          </Text>
+
+        </View>
+
+        {botao}
+
+      </Container>
+    );
+  }
+
+
+  // Linha do card "Preferências"
+  function PerfilPreferencia({
+    icone,
+    titulo,
+    indicador,
+    onPress
+  }) {
+
+    return (
+      <TouchableOpacity
+        style={styles.profilePrefRow}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+
+        <View style={styles.profilePrefIcon}>
+          <Text style={styles.profilePrefIconText}>
+            {icone}
+          </Text>
+        </View>
+
+        <Text style={styles.profilePrefText}>
+          {titulo}
+        </Text>
+
+        {indicador === 'ponto' ? (
+          <View style={styles.profilePrefDot} />
+        ) : (
+          <Text style={styles.profilePrefChevron}>
+            ›
+          </Text>
+        )}
+
+      </TouchableOpacity>
+    );
+  }
+
+
   function PerfilScreen({
     route,
     navigation
@@ -3625,6 +4046,96 @@ import React, {
 
     const [enviandoFoto, setEnviandoFoto] =
       useState(false);
+
+    // ---------- edição de dados ----------
+    // "editando" guarda qual campo está aberto ('nome' | 'cep' | 'senha')
+    // e "modalAberto" controla só a visibilidade (evita piscar na animação de saída)
+
+    const [editando, setEditando] = useState('nome');
+    const [modalAberto, setModalAberto] = useState(false);
+
+    const [campoNome, setCampoNome] = useState('');
+    const [campoCep, setCampoCep] = useState('');
+    const [senhaAtual, setSenhaAtual] = useState('');
+    const [novaSenha, setNovaSenha] = useState('');
+    const [confirmaSenha, setConfirmaSenha] = useState('');
+    const [verSenhas, setVerSenhas] = useState(false);
+
+    const [erroModal, setErroModal] = useState('');
+    const [salvando, setSalvando] = useState(false);
+    const [aviso, setAviso] = useState('');
+
+    // ---------- extras da tela ----------
+
+    const [localizacao, setLocalizacao] = useState('');
+    const [pontos, setPontos] = useState(null);
+
+
+    // Cidade/UF a partir do CEP (ViaCEP). Se falhar, mostra só o CEP.
+    useEffect(() => {
+
+      let ativo = true;
+
+      const cepNumeros = somenteDigitos(user.cep);
+
+      setLocalizacao('');
+
+      if (cepNumeros.length !== 8) {
+        return undefined;
+      }
+
+      fetch(`https://viacep.com.br/ws/${cepNumeros}/json/`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (ativo && d && !d.erro && d.localidade) {
+            setLocalizacao(`${d.localidade}, ${d.uf}`);
+          }
+        })
+        .catch(() => {});
+
+      return () => {
+        ativo = false;
+      };
+
+    }, [user.cep]);
+
+
+    // Pontos de fidelidade para o selo ao lado do nome
+    useFocusEffect(
+      useCallback(() => {
+
+        let ativo = true;
+
+        fetch(`${API_URL}/fidelidade/${user.id_usuario}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (ativo && d && d.pontos != null) {
+              setPontos(Math.round(Number(d.pontos)));
+            }
+          })
+          .catch(() => {});
+
+        return () => {
+          ativo = false;
+        };
+
+      }, [user.id_usuario])
+    );
+
+
+    // Some com o aviso de sucesso depois de alguns segundos
+    useEffect(() => {
+
+      if (!aviso) {
+        return undefined;
+      }
+
+      const timer = setTimeout(() => setAviso(''), 2800);
+
+      return () => clearTimeout(timer);
+
+    }, [aviso]);
+
 
     const escolherFoto = async () => {
 
@@ -3706,6 +4217,163 @@ import React, {
       }
     };
 
+
+    // ---------- abrir / fechar / salvar edição ----------
+
+    const abrirEdicao = (campo) => {
+
+      setCampoNome(user.nome || '');
+      setCampoCep(formatarCep(user.cep));
+      setSenhaAtual('');
+      setNovaSenha('');
+      setConfirmaSenha('');
+      setVerSenhas(false);
+      setErroModal('');
+
+      setEditando(campo);
+      setModalAberto(true);
+    };
+
+    const fecharEdicao = () => {
+
+      if (!salvando) {
+        setModalAberto(false);
+      }
+    };
+
+    const confirmarEdicao = async () => {
+
+      let dados;
+      let mensagem;
+
+      setErroModal('');
+
+      if (editando === 'nome') {
+
+        const nome = campoNome.trim().replace(/\s+/g, ' ');
+
+        if (nome.length < 6) {
+          setErroModal('O nome deve ter pelo menos 6 caracteres!');
+          return;
+        }
+
+        if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) {
+          setErroModal('O nome deve conter apenas letras!');
+          return;
+        }
+
+        if (nome === user.nome) {
+          setModalAberto(false);
+          return;
+        }
+
+        dados = { nome_completo: nome };
+        mensagem = 'Nome atualizado!';
+
+      } else if (editando === 'cep') {
+
+        const cepNumeros = somenteDigitos(campoCep);
+
+        if (cepNumeros.length !== 8) {
+          setErroModal('Digite um CEP válido com 8 números!');
+          return;
+        }
+
+        if (cepNumeros === somenteDigitos(user.cep)) {
+          setModalAberto(false);
+          return;
+        }
+
+        dados = { cep: cepNumeros };
+        mensagem = 'CEP atualizado!';
+
+      } else {
+
+        if (!senhaAtual.trim()) {
+          setErroModal('Digite sua senha atual!');
+          return;
+        }
+
+        if (novaSenha.trim().length < 6) {
+          setErroModal('A nova senha deve ter pelo menos 6 caracteres!');
+          return;
+        }
+
+        if (novaSenha.trim() !== confirmaSenha.trim()) {
+          setErroModal('A confirmação não confere com a nova senha!');
+          return;
+        }
+
+        dados = {
+          senha_atual: senhaAtual.trim(),
+          nova_senha: novaSenha.trim()
+        };
+        mensagem = 'Senha alterada com sucesso!';
+      }
+
+      setSalvando(true);
+
+      try {
+
+        const response = await fetch(
+          `${API_URL}/perfil`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              id_usuario: user.id_usuario,
+              ...dados
+            })
+          }
+        );
+
+        const data = await response
+          .json()
+          .catch(() => ({}));
+
+        if (!response.ok) {
+          setErroModal(
+            data.error ||
+            'Não foi possível salvar. Tente novamente.'
+          );
+          return;
+        }
+
+        // Atualiza o usuário guardado nas telas (nome / cep)
+        if (data.usuario) {
+          navigation.setParams({
+            user: {
+              ...user,
+              ...data.usuario
+            }
+          });
+        }
+
+        setModalAberto(false);
+        setAviso(mensagem);
+
+      } catch (error) {
+
+        setErroModal(
+          'Não foi possível conectar ao servidor.'
+        );
+
+      } finally {
+
+        setSalvando(false);
+
+      }
+    };
+
+    const emBreve = () => {
+      Alert.alert(
+        'Em breve',
+        'Esta opção estará disponível em uma próxima atualização.'
+      );
+    };
+
     const sair = () => {
       Alert.alert(
         'Sair da conta',
@@ -3733,6 +4401,40 @@ import React, {
       );
     };
 
+
+    const botaoEditar = (
+      <View style={styles.profileEditButton}>
+        <Text style={styles.profileEditIcon}>
+          ✎
+        </Text>
+      </View>
+    );
+
+    const botaoAlterar = (
+      <View style={styles.profileChangeButton}>
+        <Text style={styles.profileChangeButtonText}>
+          Alterar
+        </Text>
+      </View>
+    );
+
+    const cepFormatado = formatarCep(user.cep);
+
+    const titulosModal = {
+      nome: {
+        titulo: 'Editar nome',
+        subtitulo: 'Como você quer ser chamado no app.'
+      },
+      cep: {
+        titulo: 'Editar CEP',
+        subtitulo: 'Usamos o CEP para a sua localização.'
+      },
+      senha: {
+        titulo: 'Alterar senha',
+        subtitulo: 'Confirme a senha atual e escolha uma nova.'
+      }
+    };
+
     return (
       <SafeAreaView style={styles.screen}>
 
@@ -3747,9 +4449,9 @@ import React, {
           </Text>
 
           <Text style={styles.pageSubtitle}>
-            Informações da sua conta
+            Informações e preferências da sua conta
           </Text>
-    
+
           {/* FOTO */}
 
           <View style={styles.profileHeader}>
@@ -3792,17 +4494,30 @@ import React, {
               Toque para alterar a foto
             </Text>
 
-            <Text style={styles.profileName}>
-              {user.nome || 'Cliente'}
-            </Text>
+            <View style={styles.profileNameRow}>
+
+              <Text
+                style={styles.profileName}
+                numberOfLines={1}
+              >
+                {user.nome || 'Cliente'}
+              </Text>
+
+              {pontos !== null ? (
+                <View style={styles.profileBadge}>
+                  <Text style={styles.profileBadgeText}>
+                    ★ {pontos} pts
+                  </Text>
+                </View>
+              ) : null}
+
+            </View>
 
             <Text style={styles.profileEmail}>
               {user.email || 'Não informado'}
             </Text>
 
           </View>
-
-          
 
 
           {/* INFORMAÇÕES */}
@@ -3811,100 +4526,81 @@ import React, {
             INFORMAÇÕES DA CONTA
           </Text>
 
-
           <View style={styles.profileInfoCard}>
 
-            <View style={styles.profileInfoRow}>
-
-              <View style={styles.profileInfoIcon}>
-                <Text style={styles.profileInfoIconText}>
-                  👤
-                </Text>
-              </View>
-
-              <View style={styles.profileInfoText}>
-                <Text style={styles.profileInfoLabel}>
-                  Nome completo
-                </Text>
-
-                <Text style={styles.profileInfoValue}>
-                  {user.nome || 'Não informado'}
-                </Text>
-              </View>
-
-            </View>
-
+            <PerfilLinha
+              imagem={require('./assets/icon-usuario.png')}
+              rotulo="Nome completo"
+              valor={user.nome || 'Não informado'}
+              botao={botaoEditar}
+              onPress={() => abrirEdicao('nome')}
+            />
 
             <View style={styles.profileDivider} />
 
-
-            <View style={styles.profileInfoRow}>
-
-              <View style={styles.profileInfoIcon}>
-                <Text style={styles.profileInfoIconText}>
-                  ✉
-                </Text>
-              </View>
-
-              <View style={styles.profileInfoText}>
-                <Text style={styles.profileInfoLabel}>
-                  E-mail
-                </Text>
-
-                <Text style={styles.profileInfoValue}>
-                  {user.email || 'Não informado'}
-                </Text>
-              </View>
-
-            </View>
-
+            <PerfilLinha
+              imagem={require('./assets/icon-email.png')}
+              rotulo="E-mail"
+              tag="ATIVO"
+              valor={user.email || 'Não informado'}
+            />
 
             <View style={styles.profileDivider} />
 
-
-            <View style={styles.profileInfoRow}>
-
-              <View style={styles.profileInfoIcon}>
-                <Text style={styles.profileInfoIconText}>
-                  📍
-                </Text>
-              </View>
-
-              <View style={styles.profileInfoText}>
-                <Text style={styles.profileInfoLabel}>
-                  CEP
-                </Text>
-
-                <Text style={styles.profileInfoValue}>
-                  {user.cep || 'Não informado'}
-                </Text>
-              </View>
-
-            </View>
-
+            <PerfilLinha
+              imagem={require('./assets/icon-cep.png')}
+              rotulo="CEP & Localização"
+              valor={cepFormatado || 'Não informado'}
+              valorExtra={
+                localizacao
+                  ? `  •  ${localizacao}`
+                  : ''
+              }
+              botao={botaoEditar}
+              onPress={() => abrirEdicao('cep')}
+            />
 
             <View style={styles.profileDivider} />
 
+            <PerfilLinha
+              imagem={require('./assets/icon-senha.png')}
+              rotulo="Senha"
+              valor="••••••••"
+              botao={botaoAlterar}
+              onPress={() => abrirEdicao('senha')}
+            />
 
-            <View style={styles.profileInfoRow}>
+          </View>
 
-              <View style={styles.profileInfoIcon}>
-                <Text style={styles.profileInfoIconText}>
-                  #
-                </Text>
-              </View>
 
-              <View style={styles.profileInfoText}>
-                <Text style={styles.profileInfoLabel}>
-                  ID da conta
-                </Text>
+          {/* PREFERÊNCIAS */}
 
-                <Text style={styles.profileInfoValue}>
-                  {user.id_usuario || '-'}
-                </Text>
-              </View>
+          <Text
+            style={[
+              styles.profileSectionTitle,
+              { marginTop: 26 }
+            ]}
+          >
+            PREFERÊNCIAS
+          </Text>
 
-            </View>
+          <View style={styles.profilePrefCard}>
+
+            <PerfilPreferencia
+              icone="🔔"
+              titulo="Lembretes de Corte & Mensagens"
+              indicador="ponto"
+              onPress={emBreve}
+            />
+
+            <View style={styles.profilePrefDivider} />
+
+            <PerfilPreferencia
+              icone="💳"
+              titulo="Formas de Pagamento Salvas"
+              indicador="seta"
+              onPress={emBreve}
+            />
 
           </View>
 
@@ -3915,16 +4611,28 @@ import React, {
             style={styles.profileLogoutButton}
             onPress={sair}
           >
-            <Text style={styles.profileLogoutIcon}>
-              ↪
-            </Text>
-
-            <Text style={styles.profileLogoutText}>
-              Sair da conta
-            </Text>
+            <Image
+              source={require('./assets/botao-sair.png')}
+              style={styles.profileLogoutImage}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
         </ScrollView>
+
+
+        {/* AVISO DE SUCESSO */}
+
+        {aviso ? (
+          <View
+            style={styles.profileToast}
+            pointerEvents="none"
+          >
+            <Text style={styles.profileToastText}>
+              ✓  {aviso}
+            </Text>
+          </View>
+        ) : null}
 
 
         <BottomNav
@@ -3933,9 +4641,196 @@ import React, {
           user={user}
         />
 
+
+        {/* EDIÇÃO (NOME / CEP / SENHA) */}
+
+        <Modal
+          visible={modalAberto}
+          transparent
+          animationType="slide"
+          onRequestClose={fecharEdicao}
+        >
+
+          <KeyboardAvoidingView
+            style={styles.profileModalOverlay}
+            behavior={
+              Platform.OS === 'ios'
+                ? 'padding'
+                : undefined
+            }
+          >
+
+            <TouchableOpacity
+              style={styles.profileModalBackdrop}
+              activeOpacity={1}
+              onPress={fecharEdicao}
+            />
+
+            <View style={styles.profileModalSheet}>
+
+              <View style={styles.profileModalHandle} />
+
+              <Text style={styles.profileModalTitle}>
+                {titulosModal[editando].titulo}
+              </Text>
+
+              <Text style={styles.profileModalSubtitle}>
+                {titulosModal[editando].subtitulo}
+              </Text>
+
+              <ScrollView
+                style={styles.profileModalScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+
+                {editando === 'nome' ? (
+                  <>
+                    <Text style={styles.profileModalLabel}>
+                      Nome completo
+                    </Text>
+
+                    <TextInput
+                      style={styles.profileModalInput}
+                      value={campoNome}
+                      onChangeText={setCampoNome}
+                      placeholder="Seu nome completo"
+                      placeholderTextColor={COLORS.gray2}
+                      autoCapitalize="words"
+                      autoFocus
+                      maxLength={100}
+                    />
+                  </>
+                ) : null}
+
+                {editando === 'cep' ? (
+                  <>
+                    <Text style={styles.profileModalLabel}>
+                      CEP
+                    </Text>
+
+                    <TextInput
+                      style={styles.profileModalInput}
+                      value={campoCep}
+                      onChangeText={(t) =>
+                        setCampoCep(formatarCep(t))
+                      }
+                      placeholder="00000-000"
+                      placeholderTextColor={COLORS.gray2}
+                      keyboardType="number-pad"
+                      maxLength={9}
+                      autoFocus
+                    />
+                  </>
+                ) : null}
+
+                {editando === 'senha' ? (
+                  <>
+                    <Text style={styles.profileModalLabel}>
+                      Senha atual
+                    </Text>
+
+                    <TextInput
+                      style={styles.profileModalInput}
+                      value={senhaAtual}
+                      onChangeText={setSenhaAtual}
+                      placeholder="Digite sua senha atual"
+                      placeholderTextColor={COLORS.gray2}
+                      secureTextEntry={!verSenhas}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoFocus
+                    />
+
+                    <Text style={styles.profileModalLabel}>
+                      Nova senha
+                    </Text>
+
+                    <TextInput
+                      style={styles.profileModalInput}
+                      value={novaSenha}
+                      onChangeText={setNovaSenha}
+                      placeholder="Mínimo de 6 caracteres"
+                      placeholderTextColor={COLORS.gray2}
+                      secureTextEntry={!verSenhas}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+
+                    <Text style={styles.profileModalLabel}>
+                      Confirmar nova senha
+                    </Text>
+
+                    <TextInput
+                      style={styles.profileModalInput}
+                      value={confirmaSenha}
+                      onChangeText={setConfirmaSenha}
+                      placeholder="Repita a nova senha"
+                      placeholderTextColor={COLORS.gray2}
+                      secureTextEntry={!verSenhas}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+
+                    <TouchableOpacity
+                      onPress={() => setVerSenhas(!verSenhas)}
+                      style={styles.profileShowPass}
+                    >
+                      <Text style={styles.profileShowPassText}>
+                        {verSenhas
+                          ? 'Ocultar senhas'
+                          : 'Mostrar senhas'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+
+                {erroModal ? (
+                  <Text style={styles.profileModalError}>
+                    {erroModal}
+                  </Text>
+                ) : null}
+
+              </ScrollView>
+
+              <View style={styles.profileModalButtons}>
+
+                <TouchableOpacity
+                  style={styles.profileModalCancel}
+                  onPress={fecharEdicao}
+                  disabled={salvando}
+                >
+                  <Text style={styles.profileModalCancelText}>
+                    Cancelar
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.profileModalSave}
+                  onPress={confirmarEdicao}
+                  disabled={salvando}
+                >
+                  {salvando ? (
+                    <ActivityIndicator color="#111111" />
+                  ) : (
+                    <Text style={styles.profileModalSaveText}>
+                      Salvar
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+              </View>
+
+            </View>
+
+          </KeyboardAvoidingView>
+
+        </Modal>
+
       </SafeAreaView>
     );
   }
+
 
   // ======================================================
   // NAVEGAÇÃO INFERIOR
@@ -4216,8 +5111,7 @@ import React, {
 
     logoImage: {
       width: 90,
-      height: 60,
-      alignSelf: 'flex-start'
+      height: 60
     },
 
 
@@ -4664,12 +5558,15 @@ import React, {
     },
 
 
+    fidelityIconImage: {
+      width: 62,
+      height: 62
+    },
+
+
     fidelityIconCircle: {
       width: 62,
       height: 62,
-      borderRadius: 31,
-      backgroundColor:
-        COLORS.yellow,
       alignItems:
         'center',
       justifyContent:
@@ -4760,6 +5657,12 @@ import React, {
     },
 
 
+    inspirationCardImage: {
+      borderRadius: 25,
+      opacity: 0.9
+    },
+
+
     inspirationTitle: {
       color:
         COLORS.white,
@@ -4794,6 +5697,12 @@ import React, {
       flexDirection:
         'row',
       gap: 10
+    },
+
+
+    barberCardFixed: {
+      flex: 0,
+      width: 110
     },
 
 
@@ -5035,7 +5944,15 @@ import React, {
       justifyContent:
         'center',
       alignItems:
-        'center'
+        'center',
+      overflow:
+        'hidden'
+    },
+
+
+    serviceImage: {
+      width: '100%',
+      height: '100%'
     },
 
 
@@ -5440,6 +6357,12 @@ import React, {
     },
 
 
+    medalImage: {
+      width: 72,
+      height: 72
+    },
+
+
     progressHeader: {
       flexDirection:
         'row',
@@ -5551,6 +6474,63 @@ import React, {
 
     rewardIcon: {
       fontSize: 16
+    },
+
+
+    rewardImageWrap: {
+      width: 48,
+      height: 48
+    },
+
+
+    rewardImageBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor:
+        COLORS.card2,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+      overflow:
+        'hidden'
+    },
+
+
+    rewardImageAvailable: {
+      borderColor:
+        COLORS.yellow
+    },
+
+
+    rewardImage: {
+      width: '100%',
+      height: '100%'
+    },
+
+
+    rewardBadge: {
+      position:
+        'absolute',
+      right: -5,
+      bottom: -5,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor:
+        COLORS.card2,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+      alignItems:
+        'center',
+      justifyContent:
+        'center'
+    },
+
+
+    rewardBadgeIcon: {
+      fontSize: 10
     },
 
 
@@ -5678,7 +6658,15 @@ import React, {
       justifyContent:
         'center',
       alignItems:
-        'center'
+        'center',
+      overflow:
+        'hidden'
+    },
+
+
+    smallIconImage: {
+      width: '100%',
+      height: '100%'
     },
 
 
@@ -5841,7 +6829,15 @@ import React, {
         'center',
       justifyContent:
         'center',
-      marginRight: 12
+      marginRight: 12,
+      overflow:
+        'hidden'
+    },
+
+
+    historyServiceImage: {
+      width: '100%',
+      height: '100%'
     },
 
 
@@ -6072,7 +7068,13 @@ import React, {
     borderWidth: 3,
     borderColor: COLORS.yellow,
     padding: 3,
-    marginBottom: 15
+    marginBottom: 15,
+    backgroundColor: COLORS.bg,
+    shadowColor: COLORS.yellow,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 14
   },
 
   profilePhoto: {
@@ -6109,8 +7111,9 @@ import React, {
 
   profileName: {
     color: COLORS.white,
-    fontSize: 24,
-    fontWeight: '800'
+    fontSize: 22,
+    fontWeight: '800',
+    flexShrink: 1
   },
 
   profileEmail: {
@@ -6156,6 +7159,12 @@ import React, {
     fontSize: 20
   },
 
+  profileInfoIconImage: {
+    width: 45,
+    height: 45,
+    borderRadius: 14
+  },
+
   profileInfoText: {
     flex: 1
   },
@@ -6195,21 +7204,312 @@ import React, {
     marginRight: 10
   },
 
+  profileLogoutImage: {
+    height: 32,
+    width: 101
+  },
+
   profileLogoutText: {
     color: COLORS.red,
     fontSize: 16,
     fontWeight: '800'
   },
 
-  logoutButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  profileNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: '100%'
+  },
+
+  profileBadge: {
+    marginLeft: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(245, 197, 66, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 197, 66, 0.55)'
+  },
+
+  profileBadgeText: {
+    color: COLORS.yellow,
+    fontSize: 11,
+    fontWeight: '800'
+  },
+
+  profileLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4
+  },
+
+  profileInfoLabelInline: {
+    color: COLORS.gray,
+    fontSize: 11
+  },
+
+  profileInfoValueMuted: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '500'
+  },
+
+  profileTag: {
+    marginLeft: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(53, 201, 130, 0.16)'
+  },
+
+  profileTagText: {
+    color: COLORS.green,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6
+  },
+
+  profileEditButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.card2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10
+  },
+
+  profileEditIcon: {
+    color: COLORS.gray,
+    fontSize: 15
+  },
+
+  profileChangeButton: {
+    marginLeft: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 197, 66, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 197, 66, 0.5)'
+  },
+
+  profileChangeButtonText: {
+    color: COLORS.yellow,
+    fontSize: 12,
+    fontWeight: '800'
+  },
+
+  profilePrefCard: {
     backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: COLORS.red,
+    borderColor: COLORS.border,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 6
+  },
+
+  profilePrefRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14
+  },
+
+  profilePrefIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.card2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14
+  },
+
+  profilePrefIconText: {
+    fontSize: 16
+  },
+
+  profilePrefText: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600'
+  },
+
+  profilePrefDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.yellow
+  },
+
+  profilePrefChevron: {
+    color: COLORS.gray,
+    fontSize: 24,
+    marginTop: -3
+  },
+
+  profilePrefDivider: {
+    height: 1,
+    backgroundColor: COLORS.border
+  },
+
+  profileToast: {
+    position: 'absolute',
+    left: 22,
+    right: 22,
+    bottom: 96,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: '#12291f',
+    borderWidth: 1,
+    borderColor: COLORS.green,
+    alignItems: 'center'
+  },
+
+  profileToastText: {
+    color: COLORS.green,
+    fontSize: 14,
+    fontWeight: '800'
+  },
+
+  profileModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)'
+  },
+
+  profileModalBackdrop: {
+    flex: 1
+  },
+
+  profileModalSheet: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: COLORS.border,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 26,
+    maxHeight: '90%'
+  },
+
+  profileModalHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.border,
+    marginBottom: 18
+  },
+
+  profileModalTitle: {
+    color: COLORS.white,
+    fontSize: 22,
+    fontWeight: '800'
+  },
+
+  profileModalSubtitle: {
+    color: COLORS.gray,
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 4
+  },
+
+  profileModalScroll: {
+    flexGrow: 0
+  },
+
+  profileModalLabel: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8
+  },
+
+  profileModalInput: {
+    height: 54,
+    backgroundColor: COLORS.card2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    color: COLORS.white,
+    fontSize: 16
+  },
+
+  profileShowPass: {
+    alignSelf: 'flex-start',
+    paddingVertical: 12
+  },
+
+  profileShowPassText: {
+    color: COLORS.yellow,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+
+  profileModalError: {
+    color: COLORS.red,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 14
+  },
+
+  profileModalButtons: {
+    flexDirection: 'row',
+    marginTop: 22
+  },
+
+  profileModalCancel: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
+  },
+
+  profileModalCancelText: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: '700'
+  },
+
+  profileModalSave: {
+    flex: 1.4,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: COLORS.yellow,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+
+  profileModalSaveText: {
+    color: '#111111',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+
+  logoutButton: {
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  logoutIconImage: {
+    width: 46,
+    height: 46
   },
 
   logoutIcon: {
