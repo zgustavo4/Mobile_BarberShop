@@ -259,6 +259,113 @@ app.put('/atualizar', async (req, res) => {
     }
 });
 
+// ================= ATUALIZAR PERFIL (tela "Meu Perfil") =================
+// Altera somente o que for enviado: nome_completo, cep e/ou senha.
+// Para trocar a senha é obrigatório informar a senha atual.
+app.put('/perfil', async (req, res) => {
+    try {
+        const { id_usuario, nome_completo, cep, senha_atual, nova_senha } = req.body;
+
+        if (!id_usuario) {
+            return res.status(400).json({ error: "Usuário não informado!" });
+        }
+
+        const [rows] = await conexao.execute(
+            'SELECT id_usuario, senha FROM usuarios WHERE id_usuario = ?',
+            [id_usuario]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Usuário não encontrado!" });
+        }
+
+        const campos = [];
+        const params = [];
+        const atualizado = {};
+
+        // ---------- NOME ----------
+        if (nome_completo !== undefined) {
+            const nome = String(nome_completo).trim();
+
+            if (nome.length < 6) {
+                return res.status(400).json({ error: "O nome deve ter pelo menos 6 caracteres!" });
+            }
+
+            if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) {
+                return res.status(400).json({ error: "O nome deve conter apenas letras!" });
+            }
+
+            campos.push('nome_completo = ?');
+            params.push(nome);
+            atualizado.nome = nome;
+        }
+
+        // ---------- CEP ----------
+        if (cep !== undefined) {
+            const cepInformado = String(cep).trim();
+
+            if (!/^\d{5}-?\d{3}$/.test(cepInformado)) {
+                return res.status(400).json({ error: "Digite um CEP válido!" });
+            }
+
+            // Guarda somente os 8 números
+            const cepNumeros = cepInformado.replace('-', '');
+
+            campos.push('cep = ?');
+            params.push(cepNumeros);
+            atualizado.cep = cepNumeros;
+        }
+
+        // ---------- SENHA ----------
+        if (nova_senha !== undefined) {
+            const senhaAtual = String(senha_atual || '').trim();
+            const novaSenha = String(nova_senha).trim();
+
+            if (!senhaAtual) {
+                return res.status(400).json({ error: "Informe sua senha atual!" });
+            }
+
+            const senhaConfere = rows[0].senha
+                ? await bcrypt.compare(senhaAtual, rows[0].senha)
+                : false;
+
+            if (!senhaConfere) {
+                return res.status(401).json({ error: "Senha atual incorreta!" });
+            }
+
+            if (novaSenha.length < 6) {
+                return res.status(400).json({ error: "A nova senha deve ter pelo menos 6 caracteres!" });
+            }
+
+            if (novaSenha === senhaAtual) {
+                return res.status(400).json({ error: "A nova senha deve ser diferente da atual!" });
+            }
+
+            const hash = await bcrypt.hash(novaSenha, 10);
+
+            campos.push('senha = ?');
+            params.push(hash);
+        }
+
+        if (campos.length === 0) {
+            return res.status(400).json({ error: "Nenhuma alteração informada!" });
+        }
+
+        await conexao.execute(
+            `UPDATE usuarios SET ${campos.join(', ')} WHERE id_usuario = ?`,
+            [...params, id_usuario]
+        );
+
+        res.json({
+            mensagem: "Perfil atualizado com sucesso!",
+            usuario: atualizado
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ error: "Erro ao atualizar perfil" });
+    }
+});
+
 // ================= DELETAR USUÁRIO =================
 app.delete('/deletar', async (req, res) => {
     try {
