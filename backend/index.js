@@ -162,7 +162,7 @@ app.post('/login', async (req, res) => {
 
         const usuario = resultado[0];
 
-        // Requisito 3c: Verificar se é primeiro acesso (senha não cadastrada)
+        // Verificar se é primeiro acesso
         if (usuario.primeiro_acesso === 1 || !usuario.senha) {
             return res.status(403).json({
                 mensagem: "Primeiro acesso! Cadastre sua senha.",
@@ -182,7 +182,7 @@ app.post('/login', async (req, res) => {
                 id_usuario: usuario.id_usuario,
                 email: usuario.email,
                 nome: usuario.nome_completo,
-                perfil: usuario.perfil  // ← adicionar isso
+                perfil: usuario.perfil
             },
             api_chave,
             { expiresIn: "2h" }
@@ -219,7 +219,6 @@ app.get('/buscar', async (req, res) => {
 });
 
 // ================= ATUALIZAR USUÁRIO =================
-// Requisito 3a: Edição de usuários (nome, email, senha)
 app.put('/atualizar', async (req, res) => {
     try {
         const { id_usuario, nome_completo, cep, email, senha, foto_perfil } = req.body;
@@ -259,9 +258,7 @@ app.put('/atualizar', async (req, res) => {
     }
 });
 
-// ================= ATUALIZAR PERFIL (tela "Meu Perfil") =================
-// Altera somente o que for enviado: nome_completo, cep e/ou senha.
-// Para trocar a senha é obrigatório informar a senha atual.
+// ================= ATUALIZAR PERFIL =================
 app.put('/perfil', async (req, res) => {
     try {
         const { id_usuario, nome_completo, cep, senha_atual, nova_senha } = req.body;
@@ -391,7 +388,6 @@ app.delete('/deletar', async (req, res) => {
 });
 
 // ================= ESQUECI MINHA SENHA - SOLICITAR RECUPERAÇÃO =================
-// Requisito 3b: Recuperação de senha
 app.post('/esqueci-senha', async (req, res) => {
     const { email } = req.body;
 
@@ -440,7 +436,6 @@ app.post('/esqueci-senha', async (req, res) => {
 });
 
 // ================= RESETAR SENHA =================
-// Requisito 3b: Trocar senha
 app.post('/resetar-senha', async (req, res) => {
     const { token, nova_senha } = req.body;
 
@@ -1048,11 +1043,6 @@ app.get('/agendamentos/usuario/:id', async (req, res) => {
 });
 
 // ===================== FIDELIDADE =====================
-
-// ==========================================
-// ALTERAR STATUS DO AGENDAMENTO
-// E CREDITAR PONTOS AUTOMATICAMENTE
-// ==========================================
 
 app.patch('/agendamentos/:id/status', async (req, res) => {
 
