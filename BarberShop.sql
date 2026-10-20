@@ -169,7 +169,7 @@ INSERT INTO `servicos` (`id_servicos`, `nome`, `preco`, `duracao`, `pontos`, `st
 	(2, 'Barba', 25.00, 25, 8, 1, 80),
 	(3, 'Platinado', 150.00, 120, 60, 1, 500),
 	(4, 'Hidratação Capilar', 40.00, 40, 15, 1, 150),
-	(5, 'Sombrancelha', 10.00, 10, 5, 1, 50);
+	(5, 'Sobrancelha', 10.00, 10, 5, 1, 50);
 
 -- Copiando estrutura para tabela barbearia_db.usuarios
 DROP TABLE IF EXISTS `usuarios`;
