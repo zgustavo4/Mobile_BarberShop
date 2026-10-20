@@ -1,6 +1,6 @@
 -- --------------------------------------------------------
 -- Servidor:                     127.0.0.1
--- Versão do servidor:           10.4.32-MariaDB - mariadb.org binary distribution
+-- Versão do servidor:           12.3.3-MariaDB - MariaDB Server
 -- OS do Servidor:               Win64
 -- HeidiSQL Versão:              12.20.0.7320
 -- --------------------------------------------------------
@@ -35,9 +35,11 @@ CREATE TABLE IF NOT EXISTS `agendamentos` (
   KEY `fk_agendamento_funcionario` (`id_funcionario`) USING BTREE,
   CONSTRAINT `fk_agendamento_funcionario` FOREIGN KEY (`id_funcionario`) REFERENCES `funcionario` (`id_funcionario`),
   CONSTRAINT `fk_agendamento_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
-) ENGINE=InnoDB AUTO_INCREMENT=69 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.agendamentos: ~1 rows (aproximadamente)
+INSERT INTO `agendamentos` (`id`, `id_usuario`, `id_funcionario`, `data`, `status`, `feedback`, `forma_pagamento`) VALUES
+	(69, 1, 2, '2026-08-29 18:00:00', 'agendado', NULL, 'Pix');
 
 -- Copiando estrutura para tabela barbearia_db.agendavalor
 DROP TABLE IF EXISTS `agendavalor`;
@@ -51,7 +53,13 @@ CREATE TABLE IF NOT EXISTS `agendavalor` (
   CONSTRAINT `FK_agendavalor_servicos` FOREIGN KEY (`tipo_servico`) REFERENCES `servicos` (`id_servicos`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.agendavalor: ~5 rows (aproximadamente)
+INSERT INTO `agendavalor` (`tipo_servico`, `valor`, `id_agendamento`) VALUES
+	(5, 10.00, 69),
+	(4, 40.00, 69),
+	(3, 150.00, 69),
+	(2, 25.00, 69),
+	(1, 30.00, 69);
 
 -- Copiando estrutura para tabela barbearia_db.fidelidade
 DROP TABLE IF EXISTS `fidelidade`;
@@ -62,7 +70,7 @@ CREATE TABLE IF NOT EXISTS `fidelidade` (
   CONSTRAINT `fk_fidelidade_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.fidelidade: ~0 rows (aproximadamente)
 
 -- Copiando estrutura para tabela barbearia_db.funcionario
 DROP TABLE IF EXISTS `funcionario`;
@@ -71,9 +79,13 @@ CREATE TABLE IF NOT EXISTS `funcionario` (
   `nome` varchar(100) NOT NULL,
   `funcao` varchar(100) NOT NULL,
   PRIMARY KEY (`id_funcionario`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.funcionario: ~3 rows (aproximadamente)
+INSERT INTO `funcionario` (`id_funcionario`, `nome`, `funcao`) VALUES
+	(1, 'João Silva', 'Barbeiro'),
+	(2, 'Gustavo Lima', 'Estilista'),
+	(3, 'Enzo Serra', 'Barbeiro');
 
 -- Copiando estrutura para tabela barbearia_db.historico_resgates
 DROP TABLE IF EXISTS `historico_resgates`;
@@ -90,7 +102,7 @@ CREATE TABLE IF NOT EXISTS `historico_resgates` (
   CONSTRAINT `fk_resgate_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.historico_resgates: ~0 rows (aproximadamente)
 
 -- Copiando estrutura para tabela barbearia_db.horarios_funcionario
 DROP TABLE IF EXISTS `horarios_funcionario`;
@@ -103,9 +115,24 @@ CREATE TABLE IF NOT EXISTS `horarios_funcionario` (
   PRIMARY KEY (`id`) USING BTREE,
   KEY `fk_horario_funcionario` (`id_funcionario`) USING BTREE,
   CONSTRAINT `fk_horario_funcionario` FOREIGN KEY (`id_funcionario`) REFERENCES `funcionario` (`id_funcionario`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.horarios_funcionario: ~14 rows (aproximadamente)
+INSERT INTO `horarios_funcionario` (`id`, `id_funcionario`, `dia_semana`, `hora_inicio`, `hora_fim`) VALUES
+	(22, 1, 1, '08:00:00', '19:00:00'),
+	(23, 1, 2, '08:00:00', '19:00:00'),
+	(24, 1, 3, '08:00:00', '19:00:00'),
+	(25, 1, 4, '08:00:00', '19:00:00'),
+	(26, 1, 5, '08:00:00', '19:00:00'),
+	(27, 2, 6, '08:00:00', '20:00:00'),
+	(28, 2, 0, '08:00:00', '20:00:00'),
+	(29, 3, 1, '11:00:00', '17:00:00'),
+	(30, 3, 2, '11:00:00', '17:00:00'),
+	(31, 3, 3, '11:00:00', '17:00:00'),
+	(32, 3, 4, '11:00:00', '17:00:00'),
+	(33, 3, 5, '11:00:00', '17:00:00'),
+	(34, 3, 6, '11:00:00', '17:00:00'),
+	(35, 3, 0, '11:00:00', '17:00:00');
 
 -- Copiando estrutura para tabela barbearia_db.reset_tokens
 DROP TABLE IF EXISTS `reset_tokens`;
@@ -121,7 +148,7 @@ CREATE TABLE IF NOT EXISTS `reset_tokens` (
   CONSTRAINT `reset_tokens_ibfk_1` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.reset_tokens: ~0 rows (aproximadamente)
 
 -- Copiando estrutura para tabela barbearia_db.servicos
 DROP TABLE IF EXISTS `servicos`;
@@ -134,9 +161,15 @@ CREATE TABLE IF NOT EXISTS `servicos` (
   `status` tinyint(1) NOT NULL DEFAULT 1,
   `pontos_resgate` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_servicos`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.servicos: ~5 rows (aproximadamente)
+INSERT INTO `servicos` (`id_servicos`, `nome`, `preco`, `duracao`, `pontos`, `status`, `pontos_resgate`) VALUES
+	(1, 'Corte de Cabelo', 30.00, 30, 10, 1, 100),
+	(2, 'Barba', 25.00, 25, 8, 1, 80),
+	(3, 'Platinado', 150.00, 120, 60, 1, 500),
+	(4, 'Hidratação Capilar', 40.00, 40, 15, 1, 150),
+	(5, 'Sombrancelha', 10.00, 10, 5, 1, 50);
 
 -- Copiando estrutura para tabela barbearia_db.usuarios
 DROP TABLE IF EXISTS `usuarios`;
@@ -150,9 +183,11 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
   `perfil` enum('admin','atendente','cliente') NOT NULL DEFAULT 'cliente',
   PRIMARY KEY (`id_usuario`) USING BTREE,
   UNIQUE KEY `Email` (`email`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=45075 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Exportação de dados foi desmarcado.
+-- Copiando dados para a tabela barbearia_db.usuarios: ~1 rows (aproximadamente)
+INSERT INTO `usuarios` (`id_usuario`, `nome_completo`, `email`, `senha`, `cep`, `primeiro_acesso`, `perfil`) VALUES
+	(1, 'Gustavo', 'gustavo@gmail.com', '$2b$10$Wy85jPNPFrVga/RagIb2Te/NSbuHxbnIHMeQ6nKaor6mZ1Rdy4Mwa', '12345678', 0, 'admin');
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

@@ -3,6 +3,9 @@ const cors = require('cors')
 const mysql = require('mysql2/promise')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
+const nodemailer = require('nodemailer')
+require('dotenv').config()
 
 const app = express()
 app.use(cors())
@@ -389,49 +392,61 @@ app.delete('/deletar', async (req, res) => {
 
 // ================= ESQUECI MINHA SENHA - SOLICITAR RECUPERAÇÃO =================
 app.post('/esqueci-senha', async (req, res) => {
-    const { email } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ mensagem: 'Informe um e-mail válido.' });
+    }
 
     try {
-        const [usuario] = await conexao.execute(
-            'SELECT id_usuario, email, nome_completo FROM usuarios WHERE email = ?',
+        const [usuarios] = await conexao.execute(
+            'SELECT id_usuario, email, nome_completo FROM usuarios WHERE LOWER(email) = ?',
             [email]
         );
 
-        if (usuario.length === 0) {
-            return res.status(404).json({ mensagem: "Email não encontrado!" });
+        // Resposta igual exista ou não a conta, para não revelar e-mails cadastrados.
+        if (usuarios.length === 0) {
+            return res.json({ mensagem: 'Se esse e-mail estiver cadastrado, você receberá as instruções de recuperação.' });
         }
 
-        // Gerar token único para troca de senha
-        const resetToken = jwt.sign(
-            { id_usuario: usuario[0].id_usuario, email: usuario[0].email },
-            api_chave,
-            { expiresIn: "30min" }
-        );
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+            console.error('Recuperação de senha: configure GMAIL_USER e GMAIL_APP_PASSWORD no arquivo .env');
+            return res.status(503).json({ error: 'O envio de e-mail ainda não está configurado no servidor.' });
+        }
 
-        // Remover tokens antigos deste usuário
+        const usuario = usuarios[0];
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const expiraEm = new Date(Date.now() + 30 * 60 * 1000);
+
+        await conexao.execute('DELETE FROM reset_tokens WHERE id_usuario = ?', [usuario.id_usuario]);
         await conexao.execute(
-            'DELETE FROM reset_tokens WHERE id_usuario = ?',
-            [usuario[0].id_usuario]
+            'INSERT INTO reset_tokens (id_usuario, token, expira_em, usado) VALUES (?, ?, ?, 0)',
+            [usuario.id_usuario, resetToken, expiraEm]
         );
 
-        // Salvar novo token no banco
-        const expiraEm = new Date();
-        expiraEm.setMinutes(expiraEm.getMinutes() + 30);
-
-        await conexao.execute(
-            'INSERT INTO reset_tokens (id_usuario, token, expira_em) VALUES (?, ?, ?)',
-            [usuario[0].id_usuario, resetToken, expiraEm]
-        );
-
-        // Retornar token para demonstração (em produção enviaria por email)
-        res.json({
-            mensagem: "Link de recuperação gerado! (Em produção seria enviado por email)",
-            token: resetToken,
-            link_demo: `http://localhost:3000/resetar.html?token=${resetToken}`
+        const appLink = `${process.env.APP_RESET_URL || 'barbershop://resetar-senha'}?token=${encodeURIComponent(resetToken)}`;
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
         });
+
+        try {
+            await transporter.sendMail({
+                from: `BarberShop <${process.env.GMAIL_USER}>`,
+                to: usuario.email,
+                subject: 'Recuperação de senha - BarberShop',
+                text: `Olá${usuario.nome_completo ? ` ${usuario.nome_completo}` : ''}!\n\nRecebemos uma solicitação para redefinir a senha da sua conta BarberShop.\n\nAbra este link no celular onde o aplicativo está instalado para escolher uma nova senha:\n${appLink}\n\nO link expira em 30 minutos e só pode ser usado uma vez. Se você não solicitou a recuperação, ignore este e-mail.`,
+                html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#222"><h2>BarberShop</h2><p>Olá${usuario.nome_completo ? ` ${String(usuario.nome_completo).replace(/[&<>"']/g, '')}` : ''}!</p><p>Recebemos uma solicitação para redefinir a senha da sua conta.</p><p><a href="${appLink}" style="display:inline-block;background:#f5c542;color:#111;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Criar nova senha</a></p><p>O link expira em 30 minutos e só pode ser usado uma vez.</p><p>Se você não solicitou a recuperação, ignore este e-mail.</p></div>`
+            });
+        } catch (mailError) {
+            await conexao.execute('DELETE FROM reset_tokens WHERE token = ?', [resetToken]);
+            console.error('Falha ao enviar e-mail de recuperação:', mailError.message);
+            return res.status(502).json({ error: 'Não foi possível enviar o e-mail. Verifique as configurações do Gmail.' });
+        }
+
+        return res.json({ mensagem: 'Se esse e-mail estiver cadastrado, você receberá as instruções de recuperação.' });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Erro ao processar solicitação" });
+        console.error('Erro na solicitação de recuperação:', error.message);
+        res.status(500).json({ error: 'Erro ao processar solicitação de recuperação.' });
     }
 });
 
@@ -458,16 +473,14 @@ app.post('/resetar-senha', async (req, res) => {
             return res.status(400).json({ error: "Token inválido ou expirado! Solicite nova recuperação." });
         }
 
-        // Decodificar token
-        const decoded = jwt.verify(token, api_chave);
-
+        // O token aleatório só é válido se estiver presente no banco, não usado e dentro do prazo.
         // Hash da nova senha
         const hash = await bcrypt.hash(nova_senha, 10);
 
         // Atualizar senha do usuário
         await conexao.execute(
             'UPDATE usuarios SET senha = ?, primeiro_acesso = 0 WHERE id_usuario = ?',
-            [hash, decoded.id_usuario]
+            [hash, tokenValido[0].id_usuario]
         );
 
         // Marcar token como usado
@@ -479,9 +492,6 @@ app.post('/resetar-senha', async (req, res) => {
         res.json({ mensagem: "Senha alterada com sucesso! Agora você pode fazer login." });
     } catch (error) {
         console.log(error);
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(400).json({ error: "Token inválido!" });
-        }
         res.status(500).json({ error: "Erro ao resetar senha" });
     }
 });

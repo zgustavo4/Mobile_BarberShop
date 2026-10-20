@@ -62,11 +62,11 @@ const COLORS = {
 // COMPONENTES VISUAIS
 // ======================================================
 
-function Logo() {
+function Logo({ style }) {
   return (
     <Image
       source={require("./assets/logo.png")}
-      style={styles.logoImage}
+      style={[styles.logoImage, style]}
       resizeMode="contain"
     />
   );
@@ -163,22 +163,29 @@ function LoginScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView
-        contentContainerStyle={styles.authContainer}
+        contentContainerStyle={styles.loginContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <Logo />
+        <View style={styles.loginHeader}>
+          <View style={styles.loginLogoFrame}>
+            <Logo style={styles.loginLogoImage} />
+          </View>
 
-        <Text style={styles.brand}>BarberShop</Text>
+          <Text style={styles.loginBrand}>
+            <Text style={styles.loginBrandBarber}>BARBER</Text><Text style={styles.loginBrandShop}>SHOP</Text>
+          </Text>
+          <Text style={styles.loginTagline}>ESTILO  •  PRECISÃO  •  TRADIÇÃO</Text>
+        </View>
 
-        <Text style={styles.authTitle}>Bem-vindo de volta</Text>
+        <View style={styles.loginIntro}>
+          <Text style={styles.loginTitle}>Bem-vindo de volta</Text>
+          <Text style={styles.loginSubtitle}>Entre para agendar seu próximo corte</Text>
+        </View>
 
-        <Text style={styles.authSubtitle}>Faça login para continuar</Text>
-
-        <View style={styles.form}>
-          <Text style={styles.label}>E-MAIL</Text>
-
+        <View style={styles.loginForm}>
+          <Text style={styles.loginLabel}>E-MAIL</Text>
           <TextInput
-            style={styles.input}
+            style={styles.loginInput}
             placeholder="seu@email.com"
             placeholderTextColor={COLORS.gray}
             value={email}
@@ -188,11 +195,10 @@ function LoginScreen({ navigation }) {
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>SENHA</Text>
-
+          <Text style={styles.loginLabel}>SENHA</Text>
           <TextInput
-            style={styles.input}
-            placeholder="••••••••"
+            style={styles.loginInput}
+            placeholder="Digite sua senha"
             placeholderTextColor={COLORS.gray}
             value={senha}
             onChangeText={setSenha}
@@ -202,36 +208,203 @@ function LoginScreen({ navigation }) {
           />
 
           <TouchableOpacity
-            style={styles.forgotButton}
-            onPress={() => {
-              Alert.alert(
-                "Recuperação",
-                "Entre em contato com a barbearia para recuperar sua senha.",
-              );
-            }}
+            style={styles.loginForgotButton}
+            onPress={() => navigation.navigate("EsqueciSenha")}
           >
-            <Text style={styles.yellowText}>Esqueci a senha</Text>
+            <Text style={styles.loginForgotText}>Esqueci a senha</Text>
           </TouchableOpacity>
 
-          <PrimaryButton
-            title="Entrar"
+          <TouchableOpacity
+            style={[styles.loginPrimaryButton, loading && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            loading={loading}
-          />
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#111111" />
+            ) : (
+              <Text style={styles.loginPrimaryButtonText}>ENTRAR</Text>
+            )}
+          </TouchableOpacity>
 
-          <View style={styles.orContainer}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>OU</Text>
-            <View style={styles.orLine} />
+          <View style={styles.loginOrContainer}>
+            <View style={styles.loginOrLine} />
+            <Text style={styles.loginOrText}>OU</Text>
+            <View style={styles.loginOrLine} />
           </View>
 
           <TouchableOpacity onPress={() => navigation.navigate("Cadastro")}>
-            <Text style={styles.bottomLink}>
-              Não tem uma conta?{" "}
-              <Text style={styles.yellowText}>Cadastre-se</Text>
+            <Text style={styles.loginBottomLink}>
+              Ainda não tem uma conta? <Text style={styles.loginBottomLinkAccent}>Cadastre-se</Text>
             </Text>
           </TouchableOpacity>
         </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ======================================================
+// RECUPERAÇÃO DE SENHA
+// ======================================================
+function EsqueciSenhaScreen({ navigation }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const solicitarRecuperacao = async () => {
+    const emailLimpo = email.trim().toLowerCase();
+    if (!emailLimpo) {
+      Alert.alert("Atenção", "Digite o e-mail cadastrado na sua conta.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/esqueci-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailLimpo }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert("Não foi possível solicitar", data.error || data.mensagem || "Tente novamente mais tarde.");
+        return;
+      }
+      Alert.alert("Confira seu e-mail", data.mensagem || "Se esse e-mail estiver cadastrado, você receberá as instruções de recuperação.", [
+        { text: "OK", onPress: () => navigation.navigate("Login", { email: emailLimpo }) },
+      ]);
+    } catch (error) {
+      Alert.alert("Erro de conexão", "Não foi possível conectar ao servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.authContainer} keyboardShouldPersistTaps="handled">
+        <Logo />
+        <Text style={styles.brand}><Text style={styles.brandBarber}>Barber</Text><Text style={styles.brandShop}>Shop</Text></Text>
+        <Text style={styles.authTitle}>Recuperar senha</Text>
+        <Text style={styles.authSubtitle}>Informe o e-mail associado à sua conta. Enviaremos um link para criar uma nova senha.</Text>
+        <View style={styles.form}>
+          <Text style={styles.label}>E-MAIL CADASTRADO</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="seu@email.com"
+            placeholderTextColor={COLORS.gray}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+          />
+          <PrimaryButton title="Enviar link de recuperação" onPress={solicitarRecuperacao} loading={loading} />
+          <TouchableOpacity style={{ alignItems: "center", marginTop: 22 }} onPress={() => navigation.navigate("Login")}>
+            <Text style={styles.yellowText}>Voltar para o login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function ResetarSenhaScreen({ route, navigation }) {
+  const [token, setToken] = useState(route.params?.token || "");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (route.params?.token) setToken(route.params.token);
+  }, [route.params?.token]);
+
+  const redefinirSenha = async () => {
+    if (!token.trim()) return Alert.alert("Link inválido", "Abra novamente o link recebido por e-mail.");
+    if (novaSenha.trim().length < 6) return Alert.alert("Atenção", "A senha deve ter pelo menos 6 caracteres.");
+    if (novaSenha !== confirmarSenha) return Alert.alert("Atenção", "As senhas não coincidem.");
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/resetar-senha`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token.trim(), nova_senha: novaSenha }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert("Não foi possível alterar", data.error || "Solicite um novo link de recuperação.");
+        return;
+      }
+      Alert.alert("Senha alterada", "Sua senha foi atualizada. Entre com a nova senha.", [
+        { text: "Ir para login", onPress: () => navigation.reset({ index: 0, routes: [{ name: "Login" }] }) },
+      ]);
+    } catch (error) {
+      Alert.alert("Erro de conexão", "Não foi possível conectar ao servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.authContainer} keyboardShouldPersistTaps="handled">
+        <Logo />
+        <Text style={styles.brand}><Text style={styles.brandBarber}>Barber</Text><Text style={styles.brandShop}>Shop</Text></Text>
+        <Text style={styles.authTitle}>Nova senha</Text>
+        <Text style={styles.authSubtitle}>Escolha uma nova senha para sua conta.</Text>
+        <View style={styles.form}>
+          {!token ? <><Text style={styles.label}>TOKEN DO E-MAIL</Text><TextInput style={styles.input} placeholder="Cole o token recebido" placeholderTextColor={COLORS.gray} value={token} onChangeText={setToken} autoCapitalize="none" /></> : null}
+          <Text style={styles.label}>NOVA SENHA</Text>
+          <TextInput style={styles.input} placeholder="Mínimo de 6 caracteres" placeholderTextColor={COLORS.gray} value={novaSenha} onChangeText={setNovaSenha} secureTextEntry autoCapitalize="none" />
+          <Text style={styles.label}>CONFIRMAR NOVA SENHA</Text>
+          <TextInput style={styles.input} placeholder="Digite novamente" placeholderTextColor={COLORS.gray} value={confirmarSenha} onChangeText={setConfirmarSenha} secureTextEntry autoCapitalize="none" />
+          <PrimaryButton title="Salvar nova senha" onPress={redefinirSenha} loading={loading} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ======================================================
+// DOCUMENTOS LEGAIS
+// ======================================================
+
+function LegalDocumentScreen({ route }) {
+  const isTerms = route.name === "TermosUso";
+  const title = isTerms ? "Termos de Uso" : "Política de Privacidade";
+
+  const sections = isTerms
+    ? [
+        ["1. Sobre o aplicativo", "O BarberShop permite que clientes consultem serviços e utilizem recursos de agendamento e gerenciamento de conta oferecidos pela barbearia."],
+        ["2. Cadastro e conta", "Informe dados verdadeiros e mantenha seu e-mail atualizado. Você é responsável por manter a confidencialidade das credenciais da sua conta e por avisar a barbearia se suspeitar de uso não autorizado."],
+        ["3. Agendamentos e cancelamentos", "Confira os detalhes do serviço, data e horário antes de confirmar um agendamento. Regras de cancelamento, atrasos e disponibilidade podem ser informadas pela barbearia e devem ser consultadas antes do atendimento."],
+        ["4. Uso adequado", "Não utilize o aplicativo para atividades ilegais, tentativas de acesso não autorizado ou ações que prejudiquem o funcionamento do serviço."],
+        ["5. Disponibilidade", "O aplicativo pode ficar temporariamente indisponível para manutenção ou por problemas técnicos. Os recursos e serviços podem ser atualizados para melhorar a experiência."],
+        ["6. Contato e atualizações", "Estes termos podem ser atualizados quando necessário. Publique a versão vigente e informe um canal de contato oficial da barbearia antes de disponibilizar o aplicativo ao público."],
+      ]
+    : [
+        ["1. Dados tratados", "O aplicativo pode tratar nome completo, e-mail, CEP, dados de autenticação e informações relacionadas a agendamentos e uso dos serviços."],
+        ["2. Finalidades", "Os dados são utilizados para criar e administrar sua conta, autenticar o acesso, permitir agendamentos, prestar atendimento, enviar mensagens necessárias ao serviço e proteger a segurança do aplicativo."],
+        ["3. Compartilhamento", "Os dados devem ser acessados apenas por pessoas e fornecedores que precisem deles para operar o serviço, cumprir obrigações legais ou proteger direitos. Não venda dados pessoais dos clientes."],
+        ["4. Armazenamento e segurança", "São adotadas medidas técnicas e organizacionais razoáveis para proteger os dados. Nenhum sistema é totalmente livre de riscos; mantenha suas credenciais seguras e use apenas versões oficiais do aplicativo."],
+        ["5. Retenção e direitos", "Os dados são mantidos pelo tempo necessário às finalidades do serviço e às obrigações legais aplicáveis. Conforme a legislação, você pode solicitar confirmação de tratamento, acesso, correção ou exclusão de dados, quando cabível."],
+        ["6. Contato sobre privacidade", "Para exercer seus direitos ou esclarecer dúvidas, entre em contato pelo canal oficial da barbearia. Antes de publicar o aplicativo, substitua esta orientação pelo e-mail ou contato real do responsável pelo tratamento dos dados."],
+      ];
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.legalContainer}>
+        <Text style={styles.authTitle}>{title}</Text>
+        <Text style={styles.authSubtitle}>BarberShop · Leia com atenção</Text>
+        <Text style={styles.legalNotice}>
+          Documento inicial para o aplicativo. O responsável pela barbearia deve revisar e completar os dados de contato e as regras específicas antes de publicar.
+        </Text>
+        {sections.map(([heading, body]) => (
+          <View key={heading} style={styles.legalSection}>
+            <Text style={styles.legalHeading}>{heading}</Text>
+            <Text style={styles.legalBody}>{body}</Text>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -243,12 +416,18 @@ function LoginScreen({ navigation }) {
 
 function CadastroScreen({ navigation }) {
   const [nome, setNome] = useState("");
+  const [aceitouTermos, setAceitouTermos] = useState(false);
   const [email, setEmail] = useState("");
   const [cep, setCep] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCadastrar = async () => {
+    if (!aceitouTermos) {
+      Alert.alert("Aceite necessário", "Leia e aceite os Termos de Uso e a Política de Privacidade para criar sua conta.");
+      return;
+    }
+
     if (!nome.trim() || !email.trim() || !cep.trim() || !senha.trim()) {
       Alert.alert("Atenção", "Preencha todos os campos!");
 
@@ -306,7 +485,7 @@ function CadastroScreen({ navigation }) {
         <View style={styles.authHeader}>
           <Logo />
 
-          <Text style={styles.brand}>BarberShop</Text>
+          <Text style={styles.brand}><Text style={styles.brandBarber}>Barber</Text><Text style={styles.brandShop}>Shop</Text></Text>
         </View>
 
         <Text style={styles.authTitle}>Crie sua conta</Text>
@@ -363,14 +542,28 @@ function CadastroScreen({ navigation }) {
           />
 
           <View style={styles.termsRow}>
-            <View style={styles.checkBox}>
-              <Text style={styles.checkText}>✓</Text>
-            </View>
+            <TouchableOpacity
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: aceitouTermos }}
+              accessibilityLabel="Aceitar Termos de Uso e Política de Privacidade"
+              style={[styles.checkBox, !aceitouTermos && styles.checkBoxUnchecked]}
+              onPress={() => setAceitouTermos((valor) => !valor)}
+            >
+              {aceitouTermos ? <Text style={styles.checkText}>✓</Text> : null}
+            </TouchableOpacity>
 
             <Text style={styles.termsText}>
               Ao se cadastrar, você concorda com os{" "}
-              <Text style={styles.yellowText}>Termos de Uso</Text> e a{" "}
-              <Text style={styles.yellowText}>Política de Privacidade</Text>
+              <Text
+                accessibilityRole="link"
+                style={styles.yellowText}
+                onPress={() => navigation.navigate("TermosUso")}
+              >Termos de Uso</Text> e a{" "}
+              <Text
+                accessibilityRole="link"
+                style={styles.yellowText}
+                onPress={() => navigation.navigate("PoliticaPrivacidade")}
+              >Política de Privacidade</Text>.
             </Text>
           </View>
 
@@ -3139,7 +3332,12 @@ function BottomNav({ navigation, active, user }) {
 
 export default function App() {
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      linking={{
+        prefixes: ["barbershop://"],
+        config: { screens: { ResetarSenha: "resetar-senha" } },
+      }}
+    >
       <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
@@ -3164,6 +3362,30 @@ export default function App() {
           options={{
             headerShown: false,
           }}
+        />
+
+        <Stack.Screen
+          name="EsqueciSenha"
+          component={EsqueciSenhaScreen}
+          options={{ title: "Recuperar senha" }}
+        />
+
+        <Stack.Screen
+          name="ResetarSenha"
+          component={ResetarSenhaScreen}
+          options={{ title: "Nova senha" }}
+        />
+
+        <Stack.Screen
+          name="TermosUso"
+          component={LegalDocumentScreen}
+          options={{ title: "Termos de Uso" }}
+        />
+
+        <Stack.Screen
+          name="PoliticaPrivacidade"
+          component={LegalDocumentScreen}
+          options={{ title: "Privacidade" }}
         />
 
         <Stack.Screen
@@ -3248,6 +3470,145 @@ const styles = StyleSheet.create({
   // AUTH
   // ----------------------------
 
+  loginContainer: {
+    flexGrow: 1,
+  justifyContent: "center",
+  paddingHorizontal: 24,
+  paddingTop: 36,
+  paddingBottom: 40,
+  backgroundColor: "#101010",
+  },
+  loginHeader: {
+    alignItems: "center",
+  marginBottom: 38,
+  },
+  loginLogoFrame: {
+    width: 66,
+    height: 66,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#6F5A25",
+    backgroundColor: "#191919",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  loginLogoImage: {
+    width: 135,
+    height: 105,
+    resizeMode: "contain",
+  },
+  loginBrand: {
+     marginTop: 12,
+  fontSize: 30,
+  fontWeight: "900",
+  letterSpacing: 4.5,
+  textAlign: "center",
+  },
+  loginBrandBarber: {
+    color: "#F5F5F5",
+  fontWeight: "900",
+  },
+  loginBrandShop: {
+    color: "#F5C542",
+  fontWeight: "900",
+  },
+  loginTagline: {
+    color: "#AFAFAF",
+  fontSize: 10,
+  letterSpacing: 2.4,
+  marginTop: 8,
+  textAlign: "center",
+  },
+  loginIntro: {
+    alignItems: "center",
+  marginBottom: 28,
+  },
+  loginTitle: {
+    color: "#F7F7F7",
+  fontSize: 31,
+  fontWeight: "800",
+  textAlign: "center",
+  },
+  loginSubtitle: {
+   color: "#A5A5A5",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  loginForm: {
+    width: "100%",
+  },
+  loginLabel: {
+    color: "#D6D6D6",
+  fontSize: 13,
+  fontWeight: "700",
+  letterSpacing: 1,
+  marginTop: 19,
+  marginBottom: 9,
+  },
+  loginInput: {
+    height: 58,
+  backgroundColor: "#19191B",
+  borderWidth: 1,
+  borderColor: "#303034",
+  borderRadius: 14,
+  paddingHorizontal: 16,
+  color: "#FFFFFF",
+  fontSize: 16,
+  },
+  loginForgotButton: {
+    alignSelf: "flex-end",
+    marginTop: 12,
+    paddingVertical: 3,
+  },
+  loginForgotText: {
+    color: "#F5C542",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  loginPrimaryButton: {
+    height: 49,
+    backgroundColor: "#F5C542",
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
+  },
+  loginPrimaryButtonText: {
+    color: "#111111",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  loginOrContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 22,
+  },
+  loginOrLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#2A2A2A",
+  },
+  loginOrText: {
+    color: "#777777",
+    fontSize: 11,
+    marginHorizontal: 14,
+  },
+  loginBottomLink: {
+    textAlign: "center",
+    color: "#A5A5A5",
+    fontSize: 13,
+  },
+  loginBottomLinkAccent: {
+    color: "#F5C542",
+    fontWeight: "800",
+  },
+
   authContainer: {
     flexGrow: 1,
     padding: 28,
@@ -3271,11 +3632,26 @@ const styles = StyleSheet.create({
   },
 
   brand: {
-    color: COLORS.white,
-    fontSize: 30,
-    fontWeight: "800",
+    fontFamily: "sans-serif-condensed",
+    fontSize: 32,
+    fontWeight: "900",
     marginTop: 14,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+  },
+  brandBarber: {
+    color: "#F5F5F5",
+    fontFamily: "sans-serif-condensed",
+    fontWeight: "900",
+  },
+  brandShop: {
+    color: "#D4AF37",
+    fontFamily: "sans-serif-condensed",
+    fontWeight: "900",
+    fontStyle: "italic",
+    letterSpacing: 0.8,
+    textShadowColor: "rgba(212, 175, 55, 0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
 
   authTitle: {
@@ -3363,6 +3739,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
+  checkBoxUnchecked: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: COLORS.gray,
+  },
+
   checkText: {
     color: "#111111",
     fontWeight: "900",
@@ -3373,6 +3755,40 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     fontSize: 13,
     lineHeight: 20,
+  },
+
+  legalContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
+  },
+
+  legalNotice: {
+    color: COLORS.gray,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 18,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 10,
+  },
+
+  legalSection: {
+    marginTop: 20,
+  },
+
+  legalHeading: {
+    color: COLORS.yellow,
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+
+  legalBody: {
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 22,
   },
 
   orContainer: {
