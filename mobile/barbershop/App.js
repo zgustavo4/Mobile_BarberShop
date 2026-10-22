@@ -1689,32 +1689,6 @@ function FidelidadeScreen({ route, navigation }) {
 
   const faltam = proxima ? Math.max(0, proxima.custo - pontos) : 0;
 
-  const tiers = [
-    {
-      nome: "Bronze",
-      min: 0,
-      icone: "○",
-    },
-    {
-      nome: "Prata",
-      min: 200,
-      icone: "◇",
-    },
-    {
-      nome: "Ouro",
-      min: 500,
-      icone: "★",
-    },
-    {
-      nome: "Diamante",
-      min: 1000,
-      icone: "◆",
-    },
-  ];
-
-  const tierAtual =
-    [...tiers].reverse().find((t) => totalGanho >= t.min)?.nome || "Bronze";
-
   const handleResgatar = (idServico, nomeServico, custo) => {
     Alert.alert(
       "Confirmar resgate",
@@ -1830,29 +1804,6 @@ function FidelidadeScreen({ route, navigation }) {
               </Text>
             </>
           )}
-        </View>
-
-        {/* NÍVEIS */}
-
-        <View style={styles.tiersRow}>
-          {tiers.map((t) => {
-            const ativo = tierAtual === t.nome;
-
-            return (
-              <View
-                key={t.nome}
-                style={[styles.tier, ativo && styles.tierActive]}
-              >
-                <Text style={[styles.tierIcon, ativo && styles.yellowText]}>
-                  {t.icone}
-                </Text>
-
-                <Text style={[styles.tierText, ativo && styles.yellowText]}>
-                  {t.nome}
-                </Text>
-              </View>
-            );
-          })}
         </View>
 
         <SectionTitle>RECOMPENSAS</SectionTitle>
@@ -2596,29 +2547,6 @@ function PerfilLinha({
   );
 }
 
-// Linha do card "Preferências"
-function PerfilPreferencia({ icone, titulo, indicador, onPress }) {
-  return (
-    <TouchableOpacity
-      style={styles.profilePrefRow}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.profilePrefIcon}>
-        <Text style={styles.profilePrefIconText}>{icone}</Text>
-      </View>
-
-      <Text style={styles.profilePrefText}>{titulo}</Text>
-
-      {indicador === "ponto" ? (
-        <View style={styles.profilePrefDot} />
-      ) : (
-        <Text style={styles.profilePrefChevron}>›</Text>
-      )}
-    </TouchableOpacity>
-  );
-}
-
 function PerfilScreen({ route, navigation }) {
   const user = route.params?.user || {
     nome: "Cliente",
@@ -2915,13 +2843,6 @@ function PerfilScreen({ route, navigation }) {
     }
   };
 
-  const emBreve = () => {
-    Alert.alert(
-      "Em breve",
-      "Esta opção estará disponível em uma próxima atualização.",
-    );
-  };
-
   const sair = () => {
     Alert.alert("Sair da conta", "Deseja realmente sair?", [
       {
@@ -3070,30 +2991,6 @@ function PerfilScreen({ route, navigation }) {
             valor="••••••••"
             botao={botaoAlterar}
             onPress={() => abrirEdicao("senha")}
-          />
-        </View>
-
-        {/* PREFERÊNCIAS */}
-
-        <Text style={[styles.profileSectionTitle, { marginTop: 26 }]}>
-          PREFERÊNCIAS
-        </Text>
-
-        <View style={styles.profilePrefCard}>
-          <PerfilPreferencia
-            icone="🔔"
-            titulo="Lembretes de Corte & Mensagens"
-            indicador="ponto"
-            onPress={emBreve}
-          />
-
-          <View style={styles.profilePrefDivider} />
-
-          <PerfilPreferencia
-            icone="💳"
-            titulo="Formas de Pagamento Salvas"
-            indicador="seta"
-            onPress={emBreve}
           />
         </View>
 
@@ -4584,38 +4481,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  tiersRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 14,
-  },
-
-  tier: {
-    flex: 1,
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 16,
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-
-  tierActive: {
-    borderColor: COLORS.yellow,
-  },
-
-  tierIcon: {
-    color: COLORS.gray,
-    fontSize: 22,
-  },
-
-  tierText: {
-    color: COLORS.gray,
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 5,
-  },
-
   rewardRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -5311,60 +5176,6 @@ const styles = StyleSheet.create({
     color: COLORS.yellow,
     fontSize: 12,
     fontWeight: "800",
-  },
-
-  profilePrefCard: {
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 6,
-  },
-
-  profilePrefRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-
-  profilePrefIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: COLORS.card2,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-
-  profilePrefIconText: {
-    fontSize: 16,
-  },
-
-  profilePrefText: {
-    flex: 1,
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  profilePrefDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.yellow,
-  },
-
-  profilePrefChevron: {
-    color: COLORS.gray,
-    fontSize: 24,
-    marginTop: -3,
-  },
-
-  profilePrefDivider: {
-    height: 1,
-    backgroundColor: COLORS.border,
   },
 
   profileToast: {
