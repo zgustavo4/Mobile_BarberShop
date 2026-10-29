@@ -269,8 +269,8 @@ function EsqueciSenhaScreen({ navigation }) {
         Alert.alert("Não foi possível solicitar", data.error || data.mensagem || "Tente novamente mais tarde.");
         return;
       }
-      Alert.alert("Confira seu e-mail", data.mensagem || "Se esse e-mail estiver cadastrado, você receberá as instruções de recuperação.", [
-        { text: "OK", onPress: () => navigation.navigate("Login", { email: emailLimpo }) },
+      Alert.alert("Confira seu e-mail", data.mensagem || "Se esse e-mail estiver cadastrado, você receberá um código de recuperação.", [
+        { text: "OK", onPress: () => navigation.navigate("ResetarSenha", { email: emailLimpo }) },
       ]);
     } catch (error) {
       Alert.alert("Erro de conexão", "Não foi possível conectar ao servidor.");
@@ -285,7 +285,7 @@ function EsqueciSenhaScreen({ navigation }) {
         <Logo />
         <Text style={styles.brand}><Text style={styles.brandBarber}>Barber</Text><Text style={styles.brandShop}>Shop</Text></Text>
         <Text style={styles.authTitle}>Recuperar senha</Text>
-        <Text style={styles.authSubtitle}>Informe o e-mail associado à sua conta. Enviaremos um link para criar uma nova senha.</Text>
+        <Text style={styles.authSubtitle}>Informe o e-mail associado à sua conta. Enviaremos um código de 6 dígitos para criar uma nova senha.</Text>
         <View style={styles.form}>
           <Text style={styles.label}>E-MAIL CADASTRADO</Text>
           <TextInput
@@ -299,7 +299,7 @@ function EsqueciSenhaScreen({ navigation }) {
             autoCorrect={false}
             autoComplete="email"
           />
-          <PrimaryButton title="Enviar link de recuperação" onPress={solicitarRecuperacao} loading={loading} />
+          <PrimaryButton title="Enviar código de recuperação" onPress={solicitarRecuperacao} loading={loading} />
           <TouchableOpacity style={{ alignItems: "center", marginTop: 22 }} onPress={() => navigation.navigate("Login")}>
             <Text style={styles.yellowText}>Voltar para o login</Text>
           </TouchableOpacity>
@@ -310,17 +310,15 @@ function EsqueciSenhaScreen({ navigation }) {
 }
 
 function ResetarSenhaScreen({ route, navigation }) {
-  const [token, setToken] = useState(route.params?.token || "");
+  const [email, setEmail] = useState(route.params?.email || "");
+  const [codigo, setCodigo] = useState(route.params?.token || "");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (route.params?.token) setToken(route.params.token);
-  }, [route.params?.token]);
-
   const redefinirSenha = async () => {
-    if (!token.trim()) return Alert.alert("Link inválido", "Abra novamente o link recebido por e-mail.");
+    if (!email.trim()) return Alert.alert("Atenção", "Informe o e-mail da sua conta.");
+    if (codigo.trim().length < 6) return Alert.alert("Atenção", "Digite o código de 6 dígitos enviado por e-mail.");
     if (novaSenha.trim().length < 6) return Alert.alert("Atenção", "A senha deve ter pelo menos 6 caracteres.");
     if (novaSenha !== confirmarSenha) return Alert.alert("Atenção", "As senhas não coincidem.");
     setLoading(true);
@@ -328,11 +326,11 @@ function ResetarSenhaScreen({ route, navigation }) {
       const response = await fetch(`${API_URL}/resetar-senha`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: token.trim(), nova_senha: novaSenha }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), codigo: codigo.trim(), nova_senha: novaSenha }),
       });
       const data = await response.json();
       if (!response.ok) {
-        Alert.alert("Não foi possível alterar", data.error || "Solicite um novo link de recuperação.");
+        Alert.alert("Não foi possível alterar", data.error || "Solicite um novo código de recuperação.");
         return;
       }
       Alert.alert("Senha alterada", "Sua senha foi atualizada. Entre com a nova senha.", [
@@ -351,14 +349,20 @@ function ResetarSenhaScreen({ route, navigation }) {
         <Logo />
         <Text style={styles.brand}><Text style={styles.brandBarber}>Barber</Text><Text style={styles.brandShop}>Shop</Text></Text>
         <Text style={styles.authTitle}>Nova senha</Text>
-        <Text style={styles.authSubtitle}>Escolha uma nova senha para sua conta.</Text>
+        <Text style={styles.authSubtitle}>Digite o código de 6 dígitos que enviamos para o seu e-mail e escolha uma nova senha.</Text>
         <View style={styles.form}>
-          {!token ? <><Text style={styles.label}>TOKEN DO E-MAIL</Text><TextInput style={styles.input} placeholder="Cole o token recebido" placeholderTextColor={COLORS.gray} value={token} onChangeText={setToken} autoCapitalize="none" /></> : null}
+          <Text style={styles.label}>E-MAIL CADASTRADO</Text>
+          <TextInput style={styles.input} placeholder="seu@email.com" placeholderTextColor={COLORS.gray} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+          <Text style={styles.label}>CÓDIGO DO E-MAIL</Text>
+          <TextInput style={styles.input} placeholder="000000" placeholderTextColor={COLORS.gray} value={codigo} onChangeText={(t) => setCodigo(t.replace(/\D/g, "").slice(0, 6))} keyboardType="number-pad" maxLength={6} />
           <Text style={styles.label}>NOVA SENHA</Text>
           <TextInput style={styles.input} placeholder="Mínimo de 6 caracteres" placeholderTextColor={COLORS.gray} value={novaSenha} onChangeText={setNovaSenha} secureTextEntry autoCapitalize="none" />
           <Text style={styles.label}>CONFIRMAR NOVA SENHA</Text>
           <TextInput style={styles.input} placeholder="Digite novamente" placeholderTextColor={COLORS.gray} value={confirmarSenha} onChangeText={setConfirmarSenha} secureTextEntry autoCapitalize="none" />
           <PrimaryButton title="Salvar nova senha" onPress={redefinirSenha} loading={loading} />
+          <TouchableOpacity style={{ alignItems: "center", marginTop: 22 }} onPress={() => navigation.navigate("EsqueciSenha")}>
+            <Text style={styles.yellowText}>Não recebi o código</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -2044,6 +2048,43 @@ function HistoricoScreen({ route, navigation }) {
     }, [user?.id_usuario]),
   );
 
+  const cancelarAgendamento = (item) => {
+    Alert.alert(
+      "Cancelar agendamento",
+      "Deseja realmente cancelar este agendamento?",
+      [
+        { text: "Voltar", style: "cancel" },
+        {
+          text: "Cancelar agendamento",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await fetch(
+                `${API_URL}/agendamentos/${item.id}/status`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ status: "cancelado" }),
+                },
+              );
+
+              if (!res.ok) {
+                throw new Error("Falha ao cancelar");
+              }
+
+              await fetchHistorico(false);
+            } catch (error) {
+              Alert.alert(
+                "Erro",
+                "Não foi possível cancelar o agendamento. Tente novamente.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const cortes = historico.filter((item) => item.status === "concluido");
 
   const barbeiros = new Set(historico.map((item) => item.funcionario_nome));
@@ -2199,12 +2240,24 @@ function HistoricoScreen({ route, navigation }) {
                 ● {item.status || "agendado"}
               </Text>
 
-              <TouchableOpacity
-                style={styles.outlineButton}
-                onPress={() => navigation.navigate("Agendamento", { user })}
-              >
-                <Text style={styles.outlineText}>Reagendar</Text>
-              </TouchableOpacity>
+              <View style={styles.historyActions}>
+                {(item.status === "agendado" ||
+                  item.status === "confirmado") && (
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => cancelarAgendamento(item)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.outlineButton}
+                  onPress={() => navigation.navigate("Agendamento", { user })}
+                >
+                  <Text style={styles.outlineText}>Reagendar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -4830,6 +4883,26 @@ const styles = StyleSheet.create({
 
   outlineText: {
     color: COLORS.yellow,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  historyActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: COLORS.red,
+    borderRadius: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  cancelButtonText: {
+    color: COLORS.red,
     fontSize: 11,
     fontWeight: "800",
   },
